@@ -21,7 +21,7 @@ Quick start
 
 API Usage
 =========
-See `dump_packets.py` for a simple usage example.
+See `dump_packets.py <https://github.com/jkeljo/greeneye-monitor/blob/master/dump_packets.py>`_ for a simple usage example.
 
 GEM Setup
 =========
@@ -34,10 +34,10 @@ is the canonical source for how to do this, but here are the steps as of this wr
 2. Click "Enter Setup Mode"
 3. Click the "Packet Send" tab
 4. Set the "Primary (Com1) Packet Format" to one of the "Bin" formats. I recommend:
- * Bin32 ABS if you have a 32-channel GEM with no channels set for net metering
- * Bin32 NET if you have a 32-channel GEM and some channels are set for net metering
- * Bin48 ABS if you have a 48-channel GEM with no channels set for net metering
- * Bin48 NET if you have a 48-channel GEM and some channels are set for net metering
+    * Bin32 ABS if you have a 32-channel GEM with no channels set for net metering
+    * Bin32 NET if you have a 32-channel GEM and some channels are set for net metering
+    * Bin48 ABS if you have a 48-channel GEM with no channels set for net metering
+    * Bin48 NET if you have a 48-channel GEM and some channels are set for net metering
 5. Set the "Packet Send Interval" if you want something other than the default
 6. Click "Save"
 7. Click the "Network" tab

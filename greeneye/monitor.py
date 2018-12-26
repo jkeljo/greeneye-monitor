@@ -180,6 +180,8 @@ def _compute_delta(
 class Monitor:
     """Represents a single GreenEye Monitor"""
     def __init__(self, serial_number):
+        """serial_number is the 8 digit serial number as it appears in the GEM
+        UI"""
         self.serial_number = serial_number
         self.channels = []
         self.pulse_counters = []
@@ -294,7 +296,7 @@ class Monitors:
         return result
 
     async def _handle_packet(self, packet):
-        serial_number = packet.serial_number
+        serial_number = packet.device_id * 100000 + packet.serial_number
         new_monitor = False
         if serial_number not in self.monitors:
             LOG.info("Discovered new monitor: %s", serial_number)

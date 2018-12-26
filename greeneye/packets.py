@@ -19,6 +19,7 @@ class Packet(object):
             packet_format,
             voltage,
             absolute_watt_seconds,
+            device_id,
             serial_number,
             seconds,
             pulse_counts,
@@ -34,6 +35,7 @@ class Packet(object):
             self.polarized_watt_seconds = polarized_watt_seconds
         if currents:
             self.currents = currents
+        self.device_id = device_id
         self.serial_number = serial_number
         self.seconds = seconds
         self.pulse_counts = pulse_counts
@@ -45,6 +47,7 @@ class Packet(object):
 
     def __str__(self):
         return json.dumps({
+            'device_id': self.device_id,
             'serial_number': self.serial_number,
             'seconds': self.seconds,
             'voltage': self.voltage,
@@ -100,7 +103,7 @@ class PacketFormat(object):
                 ArrayField(num_channels, NumericField(5, lo_to_hi))
         self.fields["serial_number"] = NumericField(2, hi_to_lo)
         self.fields["reserved"] = ByteField()
-        self.fields["device_id"] = ByteField()
+        self.fields["device_id"] = NumericField(1, hi_to_lo)
         self.fields["currents"] = \
             ArrayField(num_channels, FloatingPointField(2, lo_to_hi, 50.0))
         self.fields["seconds"] = NumericField(3, lo_to_hi)

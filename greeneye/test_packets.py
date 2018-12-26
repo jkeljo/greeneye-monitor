@@ -58,6 +58,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=997492,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             voltage=121.1)
 
@@ -82,6 +83,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=997415,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             voltage=121.5)
 
@@ -106,6 +108,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=997354,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             voltage=121.3,)
 
@@ -137,6 +140,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=997327,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             voltage=121.3)
 
@@ -168,6 +172,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=841707,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             time_stamp=datetime.datetime(2017, 12, 20, 5, 7, 26),
             voltage=121.7)
@@ -213,6 +218,7 @@ Actual:
             pulse_counts=[0, 0, 0, 0],
             seconds=11988815,
             serial_number=603,
+            device_id=11,
             temperatures=[512, 0, 0, 0, 0, 0, 0, 0],
             time_stamp=datetime.datetime(2018, 6, 11, 21, 16, 58),
             voltage=122.2)

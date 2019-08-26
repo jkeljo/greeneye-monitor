@@ -307,5 +307,7 @@ class Monitors:
         await monitor.handle_packet(packet)
 
         if new_monitor:
-            await asyncio.wait([asyncio.coroutine(listener)(monitor)
-                                for listener in self._listeners])
+            listeners = [asyncio.coroutine(listener)(monitor)
+                                for listener in self._listeners]
+            if len(listeners) > 0:
+                await asyncio.wait(listeners)

@@ -50,6 +50,19 @@ class TestPacketFormats(unittest.TestCase):
             'BIN48-NET-TIME_tricky.bin',
             packets.BIN48_NET_TIME)
 
+    def test_short_packet(self):
+        packet = read_packet('BIN32-NET.bin')
+        with self.assertRaisesRegex(packets.MalformedPacketException,
+                                    'Packet too short.'):
+            packets.BIN32_NET.parse(packet[:-1])
+
+    def test_packet_with_extra_after(self):
+        data = bytearray()
+        data.extend(read_packet('BIN32-NET.bin'))
+        data.extend(read_packet('BIN32-ABS.bin'))
+
+        packet = packets.BIN32_NET.parse(data)
+        assert_packet('BIN32-NET.bin', packet)
 
 def test_packet(packet_file_name, packet_format):
     packet = parse_packet(packet_file_name, packet_format)

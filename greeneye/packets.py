@@ -132,7 +132,11 @@ class PacketFormat(object):
         return result
 
     def parse(self, packet):
-        _checksum(packet)
+        if len(packet) < self.size:
+            raise MalformedPacketException(
+                "Packet too short. Expected {0} bytes, found {1} bytes.".format(
+                    self.size, len(packet)))
+        _checksum(packet, self.size)
 
         offset = 0
         args = {
@@ -151,15 +155,15 @@ class PacketFormat(object):
         return Packet(**args)
 
 
-def _checksum(packet):
+def _checksum(packet, size):
     checksum = 0
-    for i in packet[:-1]:
+    for i in packet[:size - 1]:
         checksum += i
     checksum = checksum % 256
-    if checksum != packet[-1]:
+    if checksum != packet[size - 1]:
         raise MalformedPacketException(
             "bad checksum for packet: {0}".format(
-                codecs.encode(packet, 'hex')))
+                codecs.encode(packet[:size], 'hex')))
 
 
 BIN48_NET_TIME = PacketFormat(

@@ -7,6 +7,7 @@ LOG = logging.getLogger(__name__)
 
 class PacketIterator(object):
     """Iterates over packets from an underlying stream."""
+
     def __init__(self, stream):
         self._stream = stream
         self._total_packets = 0
@@ -86,10 +87,12 @@ class PacketIterator(object):
 
 class ServerPacketIterator(PacketIterator):
     """Provides a stream of packets from a single connected client."""
+
     def __init__(self, client_reader, client_writer):
         super().__init__(client_reader)
         self._client_writer = client_writer
-        self._peername = self._client_writer.transport.get_extra_info('peername')
+        self._peername = self._client_writer.transport.get_extra_info(
+            'peername')
         LOG.info("%s: Connected", self)
 
     def __str__(self):

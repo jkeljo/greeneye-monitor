@@ -11,6 +11,7 @@ WATTS_PER_KILOWATT = 1000
 
 class PulseCounter:
     """Represents a single GEM pulse-counting channel"""
+
     def __init__(self, monitor, number):
         self._monitor = monitor
         self.number = number
@@ -50,6 +51,7 @@ class PulseCounter:
 
 class TemperatureSensor:
     """Represents a single GEM temperature-sensor channel"""
+
     def __init__(self, monitor, number):
         self._monitor = monitor
         self.number = number
@@ -74,6 +76,7 @@ class TemperatureSensor:
 
 class Channel:
     """Represents a single GEM CT channel"""
+
     def __init__(self, monitor, number):
         self._monitor = monitor
         self.number = number
@@ -111,8 +114,10 @@ class Channel:
 
     async def handle_packet(self, packet):
         new_absolute_watt_seconds = packet.absolute_watt_seconds[self.number]
-        new_polarized_watt_seconds = packet.polarized_watt_seconds[self.number] if hasattr(packet, 'polarized_watt_seconds') else None
-        new_amps = packet.currents[self.number] if hasattr(packet, 'currents') else None
+        new_polarized_watt_seconds = packet.polarized_watt_seconds[
+            self.number] if hasattr(packet, 'polarized_watt_seconds') else None
+        new_amps = packet.currents[self.number] if hasattr(packet,
+                                                           'currents') else None
 
         if (self.absolute_watt_seconds == new_absolute_watt_seconds
                 and self.polarized_watt_seconds == new_polarized_watt_seconds
@@ -179,6 +184,7 @@ def _compute_delta(
 
 class Monitor:
     """Represents a single GreenEye Monitor"""
+
     def __init__(self, serial_number):
         """serial_number is the 8 digit serial number as it appears in the GEM
         UI"""
@@ -234,6 +240,7 @@ class Monitor:
 class MonitoringServer:
     """Listens for connections from GEMs and notifies a listener of each
     packet."""
+
     def __init__(self, port, listener):
         self._port = port
         self._server = None
@@ -280,6 +287,7 @@ class MonitoringServer:
 
 class Monitors:
     """Keeps track of all monitors that have reported data"""
+
     def __init__(self):
         self.monitors = {}
         self._listeners = []
@@ -308,6 +316,6 @@ class Monitors:
 
         if new_monitor:
             listeners = [asyncio.coroutine(listener)(monitor)
-                                for listener in self._listeners]
+                         for listener in self._listeners]
             if len(listeners) > 0:
                 await asyncio.wait(listeners)

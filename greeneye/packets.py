@@ -52,7 +52,8 @@ class Packet(object):
             'seconds': self.seconds,
             'voltage': self.voltage,
             'absolute_watt_seconds': self.absolute_watt_seconds,
-            'polarized_watt_seconds': self.polarized_watt_seconds if hasattr(self, 'polarized_watt_seconds') else None,
+            'polarized_watt_seconds': self.polarized_watt_seconds if hasattr(
+                self, 'polarized_watt_seconds') else None,
             'currents': self.currents if hasattr(self, 'currents') else None,
             'pulse_counts': self.pulse_counts,
             'temperatures': self.temperatures,
@@ -77,11 +78,13 @@ class Packet(object):
 
     @property
     def max_absolute_watt_seconds(self):
-        return self.packet_format.fields["absolute_watt_seconds"].elem_field.max
+        return self.packet_format.fields[
+            "absolute_watt_seconds"].elem_field.max
 
     @property
     def max_polarized_watt_seconds(self):
-        return self.packet_format.fields["polarized_watt_seconds"].elem_field.max
+        return self.packet_format.fields[
+            "polarized_watt_seconds"].elem_field.max
 
 
 class PacketFormat(object):

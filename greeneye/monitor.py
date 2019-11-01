@@ -2,7 +2,7 @@ import asyncio
 import logging
 import socket
 
-from .streams import ServerPacketIterator
+from .streams import PacketProtocol
 
 LOG = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
@@ -244,15 +244,18 @@ class MonitoringServer:
     def __init__(self, port, listener):
         self._port = port
         self._server = None
-        self._connections = set()
         self._listener = listener
 
     async def start(self):
-        self._server = await asyncio.start_server(
-            self._on_client_connected,
+        loop = asyncio.get_event_loop()
+        self._server = await loop.create_server(
+            lambda: PacketProtocol(self._listener),
             None,
             self._port,
             family=socket.AF_INET)
+
+        LOG.info("Server started on {}".format(
+            self._server.sockets[0].getsockname()))
 
     async def __aenter__(self):
         return self
@@ -261,28 +264,13 @@ class MonitoringServer:
         await self.close()
 
     async def close(self):
+        LOG.info("Closing server on {}".format(
+            self._server.sockets[0].getsockname()))
         # Disallow new connections
         self._server.close()
 
-        # Close out existing connections
-        for connection in self._connections:
-            connection.cancel()
-        await asyncio.wait(self._connections)
-
         # Wait for shutdown
         await self._server.wait_closed()
-
-    async def _on_client_connected(self, client_reader, client_writer):
-        conn = asyncio.ensure_future(self._handle_packets(
-            ServerPacketIterator(client_reader, client_writer)))
-        self._connections.add(conn)
-
-        await conn
-
-    async def _handle_packets(self, packets):
-        async with packets:
-            async for packet in packets:
-                await asyncio.coroutine(self._listener)(packet)
 
 
 class Monitors:

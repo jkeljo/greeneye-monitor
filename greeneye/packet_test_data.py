@@ -26,7 +26,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,
@@ -66,7 +66,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,
@@ -101,7 +101,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,
@@ -161,7 +161,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,
@@ -221,7 +221,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,
@@ -284,7 +284,7 @@ PACKETS = {
         "serial_number": 603,
         "device_id": 11,
         "temperatures": [
-            512,
+            256,
             0,
             0,
             0,

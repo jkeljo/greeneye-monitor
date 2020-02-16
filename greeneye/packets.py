@@ -115,7 +115,7 @@ class PacketFormat(object):
             NumericField(3, lo_to_hi))
         self.fields["temperatures"] = ArrayField(
             PacketFormat.NUM_TEMPERATURE_SENSORS,
-            NumericField(2, lo_to_hi))
+            FloatingPointField(2, lo_to_hi, 2.0))
         if num_channels == 32:
             self.fields["spare_bytes"] = BytesField(2)
         if has_time_stamp:

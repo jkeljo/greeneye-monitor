@@ -4,7 +4,14 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
-[1.0.1] - 2018-10-31
+[2.0] - 2020-02-16
+==================
+
+Fixed
+-----
+* Fixed issue where temperatures were reported as twice their actual value (breaking change)
+
+[1.0.1] - 2019-10-31
 ====================
 
 Changed

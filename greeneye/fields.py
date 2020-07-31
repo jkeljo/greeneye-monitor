@@ -70,18 +70,43 @@ class ArrayField(object):
             for i in range(self.num_elems)]
 
 
-def hi_to_lo(octets):
+def hi_to_lo(octets, signed=False):
     """Reads the given octets as a big-endian value. The function name comes
     from how such values are described in the packet format spec."""
+    octets = list(octets)
+    if len(octets) == 0:
+        return 0
+
+    # If this is a signed field (i.e., temperature), the highest-order
+    # bit indicates sign. Detect this (and clear the bit so we can
+    # compute the magnitude).
+    #
+    # This isn't documented in the protocol spec, but matches other
+    # implementations.
+    sign = 1
+    if signed and (octets[0] & 0x80):
+        octets[0] &= ~0x80
+        sign = -1
+
     result = 0
     for octet in octets:
         result = (result << 8) + octet
-    return result
+    return sign * result
 
 
-def lo_to_hi(octets):
+def lo_to_hi(octets, signed=False):
     """Reads the given octets as a little-endian value. The function name comes
     from how such values are described in the packet format spec."""
-    return hi_to_lo(reversed(octets))
+    return hi_to_lo(reversed(octets), signed)
 
+def hi_to_lo_signed(octets):
+    """Reads the given octets as a signed big-endian value. The function
+    name comes from how such values are described in the packet format
+    spec."""
+    return hi_to_lo(octets, True)
 
+def lo_to_hi_signed(octets):
+    """Reads the given octets as a signed little-endian value. The
+    function name comes from how such values are described in the
+    packet format spec."""
+    return lo_to_hi(octets, True)

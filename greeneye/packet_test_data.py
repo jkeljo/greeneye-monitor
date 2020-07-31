@@ -27,7 +27,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,
@@ -67,7 +67,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,
@@ -102,7 +102,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,
@@ -162,7 +162,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,
@@ -222,7 +222,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,
@@ -285,7 +285,7 @@ PACKETS = {
         "device_id": 11,
         "temperatures": [
             256,
-            0,
+            -5,
             0,
             0,
             0,

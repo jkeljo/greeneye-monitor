@@ -4,6 +4,13 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[2.1] - 2020-07-30
+==================
+
+Fixed
+-----
+* Fixed issue where negative temperatures were not handled correctly (thanks @drkp!)
+
 [2.0] - 2020-02-16
 ==================
 

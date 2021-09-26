@@ -35,12 +35,17 @@ class PulseCounter:
             elapsed_seconds = _compute_delta(
                 earlier_sample=self.seconds,
                 later_sample=packet.seconds,
-                max_value=packet.max_seconds)
+                max_value=packet.max_seconds,
+            )
 
-            self.pulses_per_second = _compute_delta(
-                earlier_sample=self.pulses,
-                later_sample=new_value,
-                max_value=packet.max_pulse_count) / elapsed_seconds
+            self.pulses_per_second = (
+                _compute_delta(
+                    earlier_sample=self.pulses,
+                    later_sample=new_value,
+                    max_value=packet.max_pulse_count,
+                )
+                / elapsed_seconds
+            )
 
         self.seconds = packet.seconds
         self.pulses = new_value
@@ -95,16 +100,14 @@ class Channel:
         if self.absolute_watt_seconds is None:
             return None
 
-        return \
-            self.absolute_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
+        return self.absolute_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
 
     @property
     def polarized_kilowatt_hours(self):
         if self.polarized_watt_seconds is None:
             return None
 
-        return \
-            self.polarized_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
+        return self.polarized_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
 
     def add_listener(self, listener):
         self._listeners.append(listener)
@@ -114,15 +117,19 @@ class Channel:
 
     async def handle_packet(self, packet):
         new_absolute_watt_seconds = packet.absolute_watt_seconds[self.number]
-        new_polarized_watt_seconds = packet.polarized_watt_seconds[
-            self.number] if hasattr(packet, 'polarized_watt_seconds') else None
-        new_amps = packet.currents[self.number] if hasattr(packet,
-                                                           'currents') else None
+        new_polarized_watt_seconds = (
+            packet.polarized_watt_seconds[self.number]
+            if hasattr(packet, "polarized_watt_seconds")
+            else None
+        )
+        new_amps = packet.currents[self.number] if hasattr(packet, "currents") else None
 
-        if (self.absolute_watt_seconds == new_absolute_watt_seconds
-                and self.polarized_watt_seconds == new_polarized_watt_seconds
-                and self.amps == new_amps
-                and self.watts == 0):
+        if (
+            self.absolute_watt_seconds == new_absolute_watt_seconds
+            and self.polarized_watt_seconds == new_polarized_watt_seconds
+            and self.amps == new_amps
+            and self.watts == 0
+        ):
             # Nothing changed
             return
 
@@ -130,34 +137,41 @@ class Channel:
             elapsed_seconds = _compute_delta(
                 earlier_sample=self.seconds,
                 later_sample=packet.seconds,
-                max_value=packet.max_seconds)
+                max_value=packet.max_seconds,
+            )
 
             # This is the total energy produced or consumed since the last
             # sample.
             delta_total_watt_seconds = _compute_delta(
                 earlier_sample=self.absolute_watt_seconds,
                 later_sample=new_absolute_watt_seconds,
-                max_value=packet.max_absolute_watt_seconds)
+                max_value=packet.max_absolute_watt_seconds,
+            )
 
             # This is the energy produced since the last sample. This will be 0
             # for all channels except for channels in NET metering mode that
             # are actually producing electricity.
-            if self.polarized_watt_seconds is not None and new_polarized_watt_seconds is not None:
+            if (
+                self.polarized_watt_seconds is not None
+                and new_polarized_watt_seconds is not None
+            ):
                 delta_watt_seconds_produced = _compute_delta(
                     earlier_sample=self.polarized_watt_seconds,
                     later_sample=new_polarized_watt_seconds,
-                    max_value=packet.max_polarized_watt_seconds)
+                    max_value=packet.max_polarized_watt_seconds,
+                )
             else:
                 delta_watt_seconds_produced = 0
 
             # This is the energy consumed since the last sample.
-            delta_watt_seconds_consumed = \
+            delta_watt_seconds_consumed = (
                 delta_total_watt_seconds - delta_watt_seconds_produced
+            )
 
             # Now compute the average power over the time since the last sample
-            self.watts = \
-                (delta_watt_seconds_consumed - delta_watt_seconds_produced) \
-                / elapsed_seconds
+            self.watts = (
+                delta_watt_seconds_consumed - delta_watt_seconds_produced
+            ) / elapsed_seconds
 
         self.seconds = packet.seconds
         self.absolute_watt_seconds = new_absolute_watt_seconds
@@ -169,10 +183,7 @@ class Channel:
             await asyncio.coroutine(listener)()
 
 
-def _compute_delta(
-        earlier_sample,
-        later_sample,
-        max_value):
+def _compute_delta(earlier_sample, later_sample, max_value):
     """Computes the difference between two samples of a value, considering
     that the value may have wrapped around in between"""
     if earlier_sample > later_sample:
@@ -211,7 +222,8 @@ class Monitor:
             elapsed_seconds = _compute_delta(
                 earlier_sample=self._last_packet_seconds,
                 later_sample=packet.seconds,
-                max_value=packet.max_seconds)
+                max_value=packet.max_seconds,
+            )
 
             if elapsed_seconds < self._packet_interval:
                 return
@@ -220,11 +232,11 @@ class Monitor:
         while len(self.channels) < packet.num_channels:
             self.channels.append(Channel(self, len(self.channels)))
         while len(self.pulse_counters) < len(packet.pulse_counts):
-            self.pulse_counters.append(
-                PulseCounter(self, len(self.pulse_counters)))
+            self.pulse_counters.append(PulseCounter(self, len(self.pulse_counters)))
         while len(self.temperature_sensors) < len(packet.temperatures):
             self.temperature_sensors.append(
-                TemperatureSensor(self, len(self.temperature_sensors)))
+                TemperatureSensor(self, len(self.temperature_sensors))
+            )
 
         self.voltage = packet.voltage
         for channel in self.channels:
@@ -251,13 +263,10 @@ class MonitoringServer:
     async def start(self):
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(
-            lambda: PacketProtocol(self._queue),
-            None,
-            self._port,
-            family=socket.AF_INET)
+            lambda: PacketProtocol(self._queue), None, self._port, family=socket.AF_INET
+        )
 
-        LOG.info("Server started on {}".format(
-            self._server.sockets[0].getsockname()))
+        LOG.info("Server started on {}".format(self._server.sockets[0].getsockname()))
 
         self._consumer_task = asyncio.ensure_future(self._consumer())
         LOG.debug("Packet processor started")
@@ -282,8 +291,7 @@ class MonitoringServer:
         await self.close()
 
     async def close(self):
-        LOG.info("Closing server on {}".format(
-            self._server.sockets[0].getsockname()))
+        LOG.info("Closing server on {}".format(self._server.sockets[0].getsockname()))
         # Disallow new connections
         self._server.close()
 
@@ -327,7 +335,8 @@ class Monitors:
         await monitor.handle_packet(packet)
 
         if new_monitor:
-            listeners = [asyncio.coroutine(listener)(monitor)
-                         for listener in self._listeners]
+            listeners = [
+                asyncio.coroutine(listener)(monitor) for listener in self._listeners
+            ]
             if len(listeners) > 0:
                 await asyncio.wait(listeners)

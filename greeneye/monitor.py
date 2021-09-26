@@ -2,7 +2,7 @@ import asyncio
 import logging
 import socket
 
-from .streams import PacketProtocol
+from siobrultech_protocols.gem.protocol import PacketProtocol
 
 LOG = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
@@ -242,20 +242,38 @@ class MonitoringServer:
     packet."""
 
     def __init__(self, port, listener):
-        self._port = port
-        self._server = None
+        self._consumer_task = None
         self._listener = listener
+        self._port = port
+        self._queue = asyncio.Queue()
+        self._server = None
 
     async def start(self):
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(
-            lambda: PacketProtocol(self._listener),
+            lambda: PacketProtocol(self._queue),
             None,
             self._port,
             family=socket.AF_INET)
 
         LOG.info("Server started on {}".format(
             self._server.sockets[0].getsockname()))
+
+        self._consumer_task = asyncio.ensure_future(self._consumer())
+        LOG.debug("Packet processor started")
+
+    async def _consumer(self):
+        try:
+            while True:
+                packet = await self._queue.get()
+                try:
+                    await self._listener(packet)
+                except Exception as exc:
+                    LOG.exception("Exception while calling the listener!", exc)
+                self._queue.task_done()
+        except asyncio.CancelledError:
+            LOG.debug("queue consumer is getting canceled")
+            raise
 
     async def __aenter__(self):
         return self
@@ -271,6 +289,12 @@ class MonitoringServer:
 
         # Wait for shutdown
         await self._server.wait_closed()
+
+        # Wait for packets to be processed
+        await self._queue.join()
+
+        # Cancel consumer task
+        self._consumer_task.cancel()
 
 
 class Monitors:

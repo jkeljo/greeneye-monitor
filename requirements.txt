@@ -1,1 +1,1 @@
-siobrultech-protocols==0.1.1
+siobrultech-protocols==0.2.0

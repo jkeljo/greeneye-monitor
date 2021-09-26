@@ -267,7 +267,7 @@ class MonitoringServer:
             while True:
                 packet = await self._queue.get()
                 try:
-                    await self.listener(packet)
+                    await self._listener(packet)
                 except Exception as exc:
                     LOG.exception("Exception while calling the listener!", exc)
                 self._queue.task_done()

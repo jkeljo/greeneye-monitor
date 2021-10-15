@@ -2,7 +2,7 @@ import asyncio
 import logging
 import socket
 
-from siobrultech_protocols.gem.protocol import PacketProtocol
+from .protocol import GemApi, GemProtocol
 
 LOG = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
@@ -263,7 +263,10 @@ class MonitoringServer:
     async def start(self):
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(
-            lambda: PacketProtocol(self._queue), None, self._port, family=socket.AF_INET
+            lambda: GemProtocol(self._queue),
+            None,
+            self._port,
+            family=socket.AF_INET,
         )
 
         LOG.info("Server started on {}".format(self._server.sockets[0].getsockname()))
@@ -271,14 +274,26 @@ class MonitoringServer:
         self._consumer_task = asyncio.ensure_future(self._consumer())
         LOG.debug("Packet processor started")
 
+    def on_connection_made(self, api: GemApi):
+        LOG.debug("Connection made")
+        asyncio.create_task(self._on_connection_made(api))
+
+    async def _on_connection_made(self, api):
+        serial_number = await api.get_serial_number()
+
+        LOG.info(f"serial number found from API: {serial_number}")
+
     async def _consumer(self):
         try:
             while True:
                 packet = await self._queue.get()
-                try:
-                    await self._listener(packet)
-                except Exception as exc:
-                    LOG.exception("Exception while calling the listener!", exc)
+                if isinstance(packet, GemApi):
+                    self.on_connection_made(packet)
+                else:
+                    try:
+                        await self._listener(packet)
+                    except Exception as exc:
+                        LOG.exception("Exception while calling the listener!", exc)
                 self._queue.task_done()
         except asyncio.CancelledError:
             LOG.debug("queue consumer is getting canceled")

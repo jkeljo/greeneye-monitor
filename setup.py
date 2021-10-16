@@ -5,14 +5,13 @@ from setuptools import setup
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(path.join(here, "README.rst"), encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
     name="greeneye-monitor",
     version="2.1",
-    description="Receive data packets from GreenEye Monitor"
-                "(http://www.brultech.com/greeneye/)",
+    description="Receive data packets from GreenEye Monitor (http://www.brultech.com/greeneye/)",
     long_description=long_description,
     url="https://github.com/jkeljo/greeneye-monitor",
     author="Jonathan Keljo",
@@ -25,7 +24,7 @@ setup(
     ],
     keywords="greeneye",
     packages=["greeneye"],
-    install_requires=[
-    ],
+    package_data={"greeneye": ["py.typed"]},
+    install_requires=[],
     python_requires="~=3.5",
 )

@@ -39,21 +39,9 @@ class PulseCounter:
             return
 
         if self.seconds is not None:
-            elapsed_seconds = _compute_delta(
-                earlier_sample=self.seconds,
-                later_sample=packet.seconds,
-                max_value=packet.max_seconds,
-            )
-
+            elapsed_seconds = packet.delta_seconds(self.seconds)
             self.pulses_per_second = (
-                (
-                    _compute_delta(
-                        earlier_sample=self.pulses,
-                        later_sample=new_value,
-                        max_value=packet.max_pulse_count,
-                    )
-                    / elapsed_seconds
-                )
+                (packet.delta_pulse_count(self.number, self.pulses) / elapsed_seconds)
                 if self.pulses is not None
                 else 0
             )
@@ -130,10 +118,10 @@ class Channel:
         new_absolute_watt_seconds = packet.absolute_watt_seconds[self.number]
         new_polarized_watt_seconds = (
             packet.polarized_watt_seconds[self.number]
-            if hasattr(packet, "polarized_watt_seconds")
+            if packet.polarized_watt_seconds
             else None
         )
-        new_amps = packet.currents[self.number] if hasattr(packet, "currents") else None
+        new_amps = packet.currents[self.number] if packet.currents else None
 
         if (
             self.absolute_watt_seconds == new_absolute_watt_seconds
@@ -145,19 +133,13 @@ class Channel:
             return
 
         if self.seconds is not None:
-            elapsed_seconds = _compute_delta(
-                earlier_sample=self.seconds,
-                later_sample=packet.seconds,
-                max_value=packet.max_seconds,
-            )
+            elapsed_seconds = packet.delta_seconds(self.seconds)
 
             # This is the total energy produced or consumed since the last
             # sample.
             delta_total_watt_seconds = (
-                _compute_delta(
-                    earlier_sample=self.absolute_watt_seconds,
-                    later_sample=new_absolute_watt_seconds,
-                    max_value=packet.max_absolute_watt_seconds,
+                packet.delta_absolute_watt_seconds(
+                    self.number, self.absolute_watt_seconds
                 )
                 if self.absolute_watt_seconds is not None
                 else 0
@@ -170,10 +152,9 @@ class Channel:
                 self.polarized_watt_seconds is not None
                 and new_polarized_watt_seconds is not None
             ):
-                delta_watt_seconds_produced = _compute_delta(
-                    earlier_sample=self.polarized_watt_seconds,
-                    later_sample=new_polarized_watt_seconds,
-                    max_value=packet.max_polarized_watt_seconds,
+                delta_watt_seconds_produced = packet.delta_polarized_watt_seconds(
+                    self.number,
+                    self.polarized_watt_seconds
                 )
             else:
                 delta_watt_seconds_produced = 0
@@ -234,12 +215,7 @@ class Monitor:
 
     async def handle_packet(self, packet: Packet) -> None:
         if self._last_packet_seconds is not None:
-            elapsed_seconds = _compute_delta(
-                earlier_sample=self._last_packet_seconds,
-                later_sample=packet.seconds,
-                max_value=packet.max_seconds,
-            )
-
+            elapsed_seconds = packet.delta_seconds(self._last_packet_seconds)
             if elapsed_seconds < self._packet_interval:
                 return
         self._last_packet_seconds = packet.seconds

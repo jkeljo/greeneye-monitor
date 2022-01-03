@@ -7,7 +7,13 @@ from types import TracebackType
 from typing import Awaitable, Callable, Dict, List, Optional, Type, Union
 
 from siobrultech_protocols.gem.packets import Packet
-from siobrultech_protocols.gem.protocol import PacketProtocol
+from siobrultech_protocols.gem.protocol import (
+    ConnectionLostMessage,
+    ConnectionMadeMessage,
+    PacketProtocol,
+    PacketProtocolMessage,
+    PacketReceivedMessage,
+)
 
 LOG = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
@@ -153,8 +159,7 @@ class Channel:
                 and new_polarized_watt_seconds is not None
             ):
                 delta_watt_seconds_produced = packet.delta_polarized_watt_seconds(
-                    self.number,
-                    self.polarized_watt_seconds
+                    self.number, self.polarized_watt_seconds
                 )
             else:
                 delta_watt_seconds_produced = 0
@@ -240,18 +245,18 @@ class Monitor:
             await asyncio.coroutine(listener)()  # type: ignore
 
 
-PacketListener = Callable[[Packet], Awaitable[None]]
+ServerListener = Callable[[PacketProtocolMessage], Awaitable[None]]
 
 
 class MonitoringServer:
     """Listens for connections from GEMs and notifies a listener of each
     packet."""
 
-    def __init__(self, port: int, listener: PacketListener) -> None:
+    def __init__(self, port: int, listener: ServerListener) -> None:
         self._consumer_task = None
         self._listener = listener
         self._port = port
-        self._queue = asyncio.Queue()
+        self._queue: asyncio.Queue[PacketProtocolMessage] = asyncio.Queue()
         self._server: Optional[Server] = None
 
     async def start(self) -> None:
@@ -268,26 +273,15 @@ class MonitoringServer:
     async def _consumer(self) -> None:
         try:
             while True:
-                packet = await self._queue.get()
+                message = await self._queue.get()
                 try:
-                    await self._listener(packet)
+                    await self._listener(message)
                 except Exception as exc:
                     LOG.exception("Exception while calling the listener!", exc)
                 self._queue.task_done()
         except asyncio.CancelledError:
             LOG.debug("queue consumer is getting canceled")
             raise
-
-    async def __aenter__(self) -> "MonitoringServer":
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> None:
-        await self.close()
 
     async def close(self) -> None:
         if self._server is not None:
@@ -318,7 +312,20 @@ class Monitors:
 
     def __init__(self):
         self.monitors: Dict[int, Monitor] = {}
+        self._protocols: Dict[int, PacketProtocol] = {}
         self._listeners: List[MonitorListener] = []
+        self._server: Optional[MonitoringServer] = None
+
+    async def __aenter__(self) -> "Monitors":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        await self.close()
 
     def add_listener(self, listener: MonitorListener) -> None:
         self._listeners.append(listener)
@@ -326,25 +333,42 @@ class Monitors:
     def remove_listener(self, listener: MonitorListener) -> None:
         self._listeners.remove(listener)
 
-    async def start_server(self, port: int) -> MonitoringServer:
-        result = MonitoringServer(port, self._handle_packet)
-        await result.start()
-        return result
+    async def start_server(self, port: int) -> None:
+        server = MonitoringServer(port, self._handle_message)
+        await server.start()
+        self._server = server
 
-    async def _handle_packet(self, packet: Packet) -> None:
-        serial_number = packet.device_id * 100000 + packet.serial_number
-        new_monitor = False
-        if serial_number not in self.monitors:
-            LOG.info("Discovered new monitor: %s", serial_number)
-            self.monitors[serial_number] = Monitor(serial_number)
-            new_monitor = True
+    async def close(self) -> None:
+        if self._server:
+            await self._server.close()
 
-        monitor = self.monitors[serial_number]
-        await monitor.handle_packet(packet)
+        while len(self._protocols) > 0:
+            _, protocol = self._protocols.popitem()
+            protocol.close()
 
-        if new_monitor:
-            listeners = [
-                asyncio.coroutine(listener)(monitor) for listener in self._listeners
-            ]
-            if len(listeners) > 0:
-                await asyncio.wait(listeners)  # type: ignore
+    async def _handle_message(self, message: PacketProtocolMessage) -> None:
+        if isinstance(message, PacketReceivedMessage):
+            packet = message.packet
+            serial_number = packet.device_id * 100000 + packet.serial_number
+            new_monitor = False
+            if serial_number not in self.monitors:
+                LOG.info("Discovered new monitor: %s", serial_number)
+                monitor = Monitor(serial_number)
+                self.monitors[serial_number] = monitor
+                new_monitor = True
+
+            monitor = self.monitors[serial_number]
+            await monitor.handle_packet(packet)
+
+            if new_monitor:
+                listeners = [
+                    asyncio.coroutine(listener)(monitor) for listener in self._listeners
+                ]
+                if len(listeners) > 0:
+                    await asyncio.wait(listeners)  # type: ignore
+        else:
+            protocol_id = id(message.protocol)
+            if isinstance(message, ConnectionLostMessage):
+                del self._protocols[protocol_id]
+            elif isinstance(message, ConnectionMadeMessage):
+                self._protocols[protocol_id] = message.protocol

@@ -8,9 +8,9 @@ num_packets = 0
 
 
 async def main(port):
-    monitors = Monitors()
-    monitors.add_listener(on_new_monitor)
-    async with await monitors.start_server(port):
+    async with Monitors() as monitors:
+        monitors.add_listener(on_new_monitor)
+        await monitors.start_server(port)
         while True:
             try:
                 await asyncio.sleep(60)

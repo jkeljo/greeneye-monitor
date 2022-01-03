@@ -26,6 +26,8 @@ async def main(port):
 
 
 def on_new_monitor(monitor: Monitor):
+    monitor.add_listener(lambda: print_monitor(monitor))
+
     monitor.voltage_sensor.add_listener(lambda: print_voltage(monitor.voltage_sensor))
 
     for channel in monitor.channels:
@@ -50,21 +52,23 @@ def on_new_temperature_sensor(temp: TemperatureSensor):
     temp.add_listener(lambda: print_temperature(temp))
 
 
+def print_monitor(monitor: Monitor):
+    print(
+        f"Monitor {monitor.serial_number} sending packets every {monitor.packet_send_interval}"
+    )
+
+
 def print_voltage(voltage_sensor: VoltageSensor):
     print(f"Voltage: {voltage_sensor.voltage} V")
 
 
 def print_channel(channel: Channel):
     print(
-        "Channel {0}: {1} W (abs={2} kWh, pol={3} kWh)".format(
+        "Channel {0}: {1:.0f} W ({2:.3f} kWh {3})".format(
             channel.number,
             channel.watts,
-            channel.absolute_watt_seconds / 3600000
-            if channel.absolute_watt_seconds is not None
-            else None,
-            channel.polarized_watt_seconds / 3600000
-            if channel.polarized_watt_seconds is not None
-            else None,
+            channel.kilowatt_hours,
+            "net" if channel.net_metering else "abs",
         )
     )
 
@@ -78,7 +82,11 @@ def print_counter(counter: PulseCounter):
 
 
 def print_temperature(sensor: TemperatureSensor):
-    print("Temperature sensor {0}: {1} F".format(sensor.number, sensor.temperature))
+    print(
+        "Temperature sensor {0}: {1} {2}".format(
+            sensor.number, sensor.temperature, sensor.unit
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -301,6 +301,10 @@ class MonitoringServer:
         if self._consumer_task is not None:
             # Cancel consumer task
             self._consumer_task.cancel()
+            try:
+                await self._consumer_task
+            except asyncio.CancelledError:
+                pass
             self._consumer_task = None
 
 

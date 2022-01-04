@@ -84,6 +84,30 @@ class TemperatureSensor:
             await asyncio.coroutine(listener)()  # type: ignore
 
 
+class VoltageSensor:
+    """Represents the GEMs voltage sensor"""
+
+    def __init__(self, monitor: "Monitor") -> None:
+        self._monitor = monitor
+        self.voltage: Optional[float] = None
+        self._listeners: List[Listener] = []
+
+    def add_listener(self, listener: Listener) -> None:
+        self._listeners.append(listener)
+
+    def remove_listener(self, listener: Listener) -> None:
+        self._listeners.remove(listener)
+
+    async def handle_packet(self, packet: Packet) -> None:
+        new_value = packet.voltage
+        if new_value == self.voltage:
+            return
+
+        self.voltage = new_value
+        for listener in self._listeners:
+            await asyncio.coroutine(listener)()  # type: ignore
+
+
 class Channel:
     """Represents a single GEM CT channel"""
 
@@ -204,7 +228,7 @@ class Monitor:
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = []
         self.temperature_sensors: List[TemperatureSensor] = []
-        self.voltage: Optional[float] = None
+        self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self._packet_interval: int = 0
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
@@ -234,7 +258,7 @@ class Monitor:
                 TemperatureSensor(self, len(self.temperature_sensors))
             )
 
-        self.voltage = packet.voltage
+        await self.voltage_sensor.handle_packet(packet)
         for channel in self.channels:
             await channel.handle_packet(packet)
         for temperature_sensor in self.temperature_sensors:

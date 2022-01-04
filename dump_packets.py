@@ -2,7 +2,14 @@ import asyncio
 import logging
 import sys
 
-from greeneye.monitor import Channel, Monitor, Monitors, PulseCounter, TemperatureSensor
+from greeneye.monitor import (
+    Channel,
+    Monitor,
+    Monitors,
+    PulseCounter,
+    TemperatureSensor,
+    VoltageSensor,
+)
 
 num_packets = 0
 
@@ -19,6 +26,8 @@ async def main(port):
 
 
 def on_new_monitor(monitor: Monitor):
+    monitor.voltage_sensor.add_listener(lambda: print_voltage(monitor.voltage_sensor))
+
     for channel in monitor.channels:
         on_new_channel(channel)
 
@@ -39,6 +48,10 @@ def on_new_counter(counter: PulseCounter):
 
 def on_new_temperature_sensor(temp: TemperatureSensor):
     temp.add_listener(lambda: print_temperature(temp))
+
+
+def print_voltage(voltage_sensor: VoltageSensor):
+    print(f"Voltage: {voltage_sensor.voltage} V")
 
 
 def print_channel(channel: Channel):

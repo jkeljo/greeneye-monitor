@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import asyncio
 import logging
 import sys
@@ -14,10 +15,50 @@ from greeneye.monitor import (
 num_packets = 0
 
 
-async def main(port):
+async def main():
+    parser = ArgumentParser()
+    subcommands = parser.add_subparsers(dest="subcommand")
+
+    listen_command = subcommands.add_parser(
+        "listen", description="Listens for incoming connections from GEMs."
+    )
+    listen_command.add_argument(
+        "port", help="Port on which to listen for incoming GEM packets."
+    )
+
+    spy_command = subcommands.add_parser(
+        "spy",
+        description="Connects to a GEM at the given IP and spies on whatever packets it is sending (regardless of their destination).",
+    )
+    spy_command.add_argument(
+        "host", help="Hostname or IP address of the GEM to which to connect."
+    )
+
+    args = parser.parse_args()
+    if args.subcommand == "listen":
+        await listen(args.port)
+    elif args.subcommand == "spy":
+        await spy(args.host)
+    else:
+        print(f"Unknown subcommand: {args.subcommand}")
+        sys.exit(-1)
+
+
+async def listen(port: int) -> None:
     async with Monitors() as monitors:
         monitors.add_listener(on_new_monitor)
         await monitors.start_server(port)
+        while True:
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                break
+
+
+async def spy(host: str) -> None:
+    async with Monitors() as monitors:
+        monitors.add_listener(on_new_monitor)
+        monitor = await monitors.connect(host)
         while True:
             try:
                 await asyncio.sleep(60)
@@ -63,14 +104,15 @@ def print_voltage(voltage_sensor: VoltageSensor):
 
 
 def print_channel(channel: Channel):
-    print(
-        "Channel {0}: {1:.0f} W ({2:.3f} kWh {3})".format(
-            channel.number,
-            channel.watts,
-            channel.kilowatt_hours,
-            "net" if channel.net_metering else "abs",
+    if channel.watts and channel.kilowatt_hours:
+        print(
+            "Channel {0}: {1:.0f} W ({2:.3f} kWh {3})".format(
+                channel.number,
+                channel.watts,
+                channel.kilowatt_hours,
+                "net" if channel.net_metering else "abs",
+            )
         )
-    )
 
 
 def print_counter(counter: PulseCounter):
@@ -97,7 +139,7 @@ if __name__ == "__main__":
     )
 
     loop = asyncio.get_event_loop()
-    task = asyncio.ensure_future(main(int(sys.argv[1])))
+    task = asyncio.ensure_future(main())
     try:
         loop.run_until_complete(task)
     except KeyboardInterrupt:

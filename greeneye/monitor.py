@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import logging
 import socket
 from types import TracebackType
-from typing import Awaitable, Callable, Dict, List, Optional, Type, Union
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from siobrultech_protocols.gem import api
 from siobrultech_protocols.gem.packets import Packet
@@ -270,17 +270,11 @@ NUM_TEMPERATURE_SENSORS: int = 8
 class Monitor:
     """Represents a single GreenEye Monitor"""
 
-    @staticmethod
-    async def _create(serial_number: int, protocol: BidirectionalProtocol) -> "Monitor":
-        monitor = Monitor(serial_number, protocol)
-        await monitor._sync_with_settings()
-        return monitor
-
-    def __init__(self, serial_number: int, protocol: BidirectionalProtocol) -> None:
+    def __init__(self, serial_number: int) -> None:
         """serial_number is the 8 digit serial number as it appears in the GEM
         UI"""
         self.serial_number = serial_number
-        self._protocol = protocol
+        self._protocol: Optional[BidirectionalProtocol] = None
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = [
             PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
@@ -292,15 +286,16 @@ class Monitor:
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
 
-    async def _set_protocol(self, protocol: BidirectionalProtocol) -> None:
+    async def _set_protocol(self, protocol: Optional[BidirectionalProtocol]) -> None:
         if self._protocol is protocol:
             return
 
         self._protocol = protocol
-        await self._sync_with_settings()
+        if self._protocol:
+            await self._sync_with_settings(self._protocol)
 
-    async def _sync_with_settings(self) -> None:
-        settings = await get_all_settings(self._protocol, self.serial_number)
+    async def _sync_with_settings(self, protocol: BidirectionalProtocol) -> None:
+        settings = await get_all_settings(protocol, self.serial_number)
 
         self.packet_send_interval = settings.packet_send_interval
 
@@ -361,37 +356,48 @@ async def _invoke_listeners(listeners: List[Listener]) -> None:
 
 
 ServerListener = Callable[[PacketProtocolMessage], Awaitable[None]]
+GEM_PORT = 8000
 
 
-class MonitoringServer:
+class MonitorProtocolProcessor:
     """Listens for connections from GEMs and notifies a listener of each
     packet."""
 
-    def __init__(self, port: int, listener: ServerListener) -> None:
-        self._consumer_task = None
+    def __init__(self, listener: ServerListener) -> None:
+        self._consumer_task = asyncio.ensure_future(self._consumer())
+        LOG.debug("Packet processor started")
         self._listener = listener
-        self._port = port
         self._queue: asyncio.Queue[PacketProtocolMessage] = asyncio.Queue()
         self._server: Optional[Server] = None
+        self._protocols: Dict[int, BidirectionalProtocol] = {}
 
-    async def start(self) -> None:
+    async def connect(
+        self, hostname: str
+    ) -> Tuple[asyncio.BaseTransport, asyncio.BaseProtocol]:
+        loop = asyncio.get_event_loop()
+        return await loop.create_connection(
+            self._create_protocol,
+            host=hostname,
+            port=GEM_PORT,
+        )
+
+    async def start_server(self, port: int) -> None:
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(
-            lambda: BidirectionalProtocol(self._queue),
+            self._create_protocol,
             None,
-            self._port,
+            port,
             family=socket.AF_INET,
         )
 
         LOG.info("Server started on {}".format(self._server.sockets[0].getsockname()))
 
-        self._consumer_task = asyncio.ensure_future(self._consumer())
-        LOG.debug("Packet processor started")
-
     async def _consumer(self) -> None:
         try:
             while True:
                 message = await self._queue.get()
+                if isinstance(message, ConnectionLostMessage):
+                    del self._protocols[id(message.protocol)]
                 try:
                     await self._listener(message)
                 except Exception as exc:
@@ -400,6 +406,11 @@ class MonitoringServer:
         except asyncio.CancelledError:
             LOG.debug("queue consumer is getting canceled")
             raise
+
+    def _create_protocol(self) -> BidirectionalProtocol:
+        protocol = BidirectionalProtocol(self._queue)
+        self._protocols[id(protocol)] = protocol
+        return protocol
 
     async def close(self) -> None:
         if self._server is not None:
@@ -425,6 +436,10 @@ class MonitoringServer:
                 pass
             self._consumer_task = None
 
+        while len(self._protocols) > 0:
+            (_, protocol) = self._protocols.popitem()
+            protocol.close()
+
 
 MonitorListener = Union[Callable[[Monitor], Awaitable[None]], Callable[[Monitor], None]]
 
@@ -434,9 +449,11 @@ class Monitors:
 
     def __init__(self):
         self.monitors: Dict[int, Monitor] = {}
-        self._protocols: Dict[int, BidirectionalProtocol] = {}
+        self._protocol_to_monitors: Dict[int, List[Monitor]] = {}
         self._listeners: List[MonitorListener] = []
-        self._server: Optional[MonitoringServer] = None
+        self._processor: MonitorProtocolProcessor = MonitorProtocolProcessor(
+            self._handle_message
+        )
 
     async def __aenter__(self) -> "Monitors":
         return self
@@ -456,43 +473,60 @@ class Monitors:
         self._listeners.remove(listener)
 
     async def start_server(self, port: int) -> None:
-        server = MonitoringServer(port, self._handle_message)
-        await server.start()
-        self._server = server
+        await self._processor.start_server(port)
+
+    async def connect(self, host: str) -> Monitor:
+        (_, protocol) = await self._processor.connect(host)
+        assert isinstance(protocol, BidirectionalProtocol)
+        serial_number = await api.get_serial_number(protocol)
+        monitor = self._add_monitor(serial_number)
+        await self._set_monitor_protocol(monitor, protocol)
+        await self._notify_new_monitor(monitor)
+        return monitor
 
     async def close(self) -> None:
-        if self._server:
-            await self._server.close()
-
-        while len(self._protocols) > 0:
-            _, protocol = self._protocols.popitem()
-            protocol.close()
+        await self._processor.close()
 
     async def _handle_message(self, message: PacketProtocolMessage) -> None:
         assert isinstance(message.protocol, BidirectionalProtocol)
+        protocol_id = id(message.protocol)
         if isinstance(message, PacketReceivedMessage):
             packet = message.packet
             serial_number = packet.device_id * 100000 + packet.serial_number
             new_monitor = False
             if serial_number not in self.monitors:
-                LOG.info("Discovered new monitor: %s", serial_number)
-                monitor = await Monitor._create(serial_number, message.protocol)
-                self.monitors[serial_number] = monitor
+                self._add_monitor(serial_number)
                 new_monitor = True
-
             monitor = self.monitors[serial_number]
-            await monitor._set_protocol(message.protocol)
+
+            await self._set_monitor_protocol(monitor, message.protocol)
             await monitor.handle_packet(packet)
 
             if new_monitor:
-                listeners = [
-                    asyncio.coroutine(listener)(monitor) for listener in self._listeners
-                ]
-                if len(listeners) > 0:
-                    await asyncio.wait(listeners)  # type: ignore
+                await self._notify_new_monitor(monitor)
         else:
-            protocol_id = id(message.protocol)
             if isinstance(message, ConnectionLostMessage):
-                del self._protocols[protocol_id]
+                for monitor in self._protocol_to_monitors.pop(protocol_id):
+                    await monitor._set_protocol(None)
             elif isinstance(message, ConnectionMadeMessage):
-                self._protocols[protocol_id] = message.protocol
+                self._protocol_to_monitors[protocol_id] = []
+
+    def _add_monitor(self, serial_number) -> Monitor:
+        LOG.info("Discovered new monitor: %s", serial_number)
+        monitor = Monitor(serial_number)
+        self.monitors[serial_number] = monitor
+        return monitor
+
+    async def _set_monitor_protocol(
+        self, monitor: Monitor, protocol: BidirectionalProtocol
+    ) -> None:
+        protocol_id = id(protocol)
+        self._protocol_to_monitors[protocol_id].append(monitor)
+        await monitor._set_protocol(protocol)
+
+    async def _notify_new_monitor(self, monitor: Monitor) -> None:
+        listeners = [
+            asyncio.coroutine(listener)(monitor) for listener in self._listeners
+        ]
+        if len(listeners) > 0:
+            await asyncio.wait(listeners)  # type: ignore

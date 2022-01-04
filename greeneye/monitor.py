@@ -259,16 +259,6 @@ class Channel:
         await _invoke_listeners(self._listeners)
 
 
-def _compute_delta(earlier_sample: int, later_sample: int, max_value: int) -> int:
-    """Computes the difference between two samples of a value, considering
-    that the value may have wrapped around in between"""
-    if earlier_sample > later_sample:
-        # Wraparound occurred
-        return later_sample - (max_value - earlier_sample)
-
-    return later_sample - earlier_sample
-
-
 NUM_PULSE_COUNTERS: int = 4
 NUM_TEMPERATURE_SENSORS: int = 8
 

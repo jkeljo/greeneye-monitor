@@ -55,8 +55,7 @@ class PulseCounter:
         self.seconds = packet.seconds
         self.pulses = new_value
 
-        for listener in self._listeners:
-            await asyncio.coroutine(listener)()  # type: ignore
+        await _invoke_listeners(self._listeners)
 
 
 class TemperatureSensor:
@@ -80,8 +79,7 @@ class TemperatureSensor:
             return
 
         self.temperature = new_value
-        for listener in self._listeners:
-            await asyncio.coroutine(listener)()  # type: ignore
+        await _invoke_listeners(self._listeners)
 
 
 class VoltageSensor:
@@ -104,8 +102,7 @@ class VoltageSensor:
             return
 
         self.voltage = new_value
-        for listener in self._listeners:
-            await asyncio.coroutine(listener)()  # type: ignore
+        await _invoke_listeners(self._listeners)
 
 
 class Channel:
@@ -204,8 +201,7 @@ class Channel:
         self.amps = new_amps
         self.timestamp = packet.time_stamp
 
-        for listener in self._listeners:
-            await asyncio.coroutine(listener)()  # type: ignore
+        await _invoke_listeners(self._listeners)
 
 
 def _compute_delta(earlier_sample: int, later_sample: int, max_value: int) -> int:
@@ -265,8 +261,13 @@ class Monitor:
             await temperature_sensor.handle_packet(packet)
         for pulse_counter in self.pulse_counters:
             await pulse_counter.handle_packet(packet)
-        for listener in self._listeners:
-            await asyncio.coroutine(listener)()  # type: ignore
+        await _invoke_listeners(self._listeners)
+
+
+async def _invoke_listeners(listeners: List[Listener]) -> None:
+    coroutines = [asyncio.coroutine(listener)() for listener in listeners]
+    if len(coroutines) > 0:
+        await asyncio.wait(coroutines)  # type: ignore
 
 
 ServerListener = Callable[[PacketProtocolMessage], Awaitable[None]]

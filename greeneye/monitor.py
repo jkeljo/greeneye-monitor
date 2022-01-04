@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 from asyncio.base_events import Server
 from datetime import datetime, timedelta
@@ -9,14 +10,19 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 from siobrultech_protocols.gem import api
 from siobrultech_protocols.gem.packets import Packet
 from siobrultech_protocols.gem.protocol import (
-    BidirectionalProtocol,
     ConnectionLostMessage,
     ConnectionMadeMessage,
     PacketProtocolMessage,
     PacketReceivedMessage,
 )
 
-from greeneye.api import GemSettings, TemperatureUnit, get_all_settings
+from .api import (
+    GemSettings,
+    TemperatureUnit,
+    get_all_settings,
+    set_packet_destination,
+)
+from .protocol import GemProtocol
 
 LOG = logging.getLogger(__name__)
 SECONDS_PER_HOUR = 3600
@@ -274,7 +280,7 @@ class Monitor:
         """serial_number is the 8 digit serial number as it appears in the GEM
         UI"""
         self.serial_number = serial_number
-        self._protocol: Optional[BidirectionalProtocol] = None
+        self._protocol: Optional[GemProtocol] = None
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = [
             PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
@@ -286,7 +292,7 @@ class Monitor:
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
 
-    async def _set_protocol(self, protocol: Optional[BidirectionalProtocol]) -> None:
+    async def _set_protocol(self, protocol: Optional[GemProtocol]) -> None:
         if self._protocol is protocol:
             return
 
@@ -294,7 +300,7 @@ class Monitor:
         if self._protocol:
             await self._sync_with_settings(self._protocol)
 
-    async def _sync_with_settings(self, protocol: BidirectionalProtocol) -> None:
+    async def _sync_with_settings(self, protocol: GemProtocol) -> None:
         settings = await get_all_settings(protocol, self.serial_number)
 
         self.packet_send_interval = settings.packet_send_interval
@@ -322,6 +328,27 @@ class Monitor:
         for listener in self._listeners:
             coroutines.append(asyncio.coroutine(listener)())
         await asyncio.wait(coroutines)
+
+    async def set_packet_destination(
+        self, host: str, port: int, session: aiohttp.ClientSession
+    ) -> None:
+        if self._protocol:
+            peername = self._protocol.peername
+            if peername:
+                (gem_host, _) = peername
+
+                await set_packet_destination(gem_host, host, port, session)
+                LOG.info(
+                    "%d: Configured to send packets to %s:%d",
+                    self.serial_number,
+                    host,
+                    port,
+                )
+                return
+
+        raise Exception(
+            "Cannot set packet destination when connected to the monitor via something other than a TCP socket."
+        )
 
     def set_packet_interval(self, seconds: int) -> None:
         self._packet_interval = seconds
@@ -369,7 +396,7 @@ class MonitorProtocolProcessor:
         self._listener = listener
         self._queue: asyncio.Queue[PacketProtocolMessage] = asyncio.Queue()
         self._server: Optional[Server] = None
-        self._protocols: Dict[int, BidirectionalProtocol] = {}
+        self._protocols: Dict[int, GemProtocol] = {}
 
     async def connect(
         self, hostname: str
@@ -407,8 +434,8 @@ class MonitorProtocolProcessor:
             LOG.debug("queue consumer is getting canceled")
             raise
 
-    def _create_protocol(self) -> BidirectionalProtocol:
-        protocol = BidirectionalProtocol(self._queue)
+    def _create_protocol(self) -> GemProtocol:
+        protocol = GemProtocol(self._queue)
         self._protocols[id(protocol)] = protocol
         return protocol
 
@@ -477,7 +504,7 @@ class Monitors:
 
     async def connect(self, host: str) -> Monitor:
         (_, protocol) = await self._processor.connect(host)
-        assert isinstance(protocol, BidirectionalProtocol)
+        assert isinstance(protocol, GemProtocol)
         serial_number = await api.get_serial_number(protocol)
         monitor = self._add_monitor(serial_number)
         await self._set_monitor_protocol(monitor, protocol)
@@ -488,7 +515,7 @@ class Monitors:
         await self._processor.close()
 
     async def _handle_message(self, message: PacketProtocolMessage) -> None:
-        assert isinstance(message.protocol, BidirectionalProtocol)
+        assert isinstance(message.protocol, GemProtocol)
         protocol_id = id(message.protocol)
         if isinstance(message, PacketReceivedMessage):
             packet = message.packet
@@ -518,7 +545,7 @@ class Monitors:
         return monitor
 
     async def _set_monitor_protocol(
-        self, monitor: Monitor, protocol: BidirectionalProtocol
+        self, monitor: Monitor, protocol: GemProtocol
     ) -> None:
         protocol_id = id(protocol)
         self._protocol_to_monitors[protocol_id].append(monitor)

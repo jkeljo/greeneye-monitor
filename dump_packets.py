@@ -1,7 +1,9 @@
+import aiohttp
 from argparse import ArgumentParser
 import asyncio
 import logging
 import sys
+from typing import Tuple
 
 from greeneye.monitor import (
     Channel,
@@ -34,11 +36,47 @@ async def main():
         "host", help="Hostname or IP address of the GEM to which to connect."
     )
 
+    redirect_command = subcommands.add_parser(
+        "redirect",
+        description="Connects to a GEM and redirects its packets to this machine, redirecting back afterwards.",
+    )
+    redirect_command.add_argument(
+        "--gem", required=True, help="Hostname or IP address of the GEM."
+    )
+    redirect_command.add_argument(
+        "--redirect-to-host",
+        required=True,
+        help="Hostname of the machine to redirect packets to.",
+    )
+    redirect_command.add_argument(
+        "--redirect-to-port",
+        type=int,
+        required=True,
+        help="Port of the machine to redirect packets to.",
+    )
+    redirect_command.add_argument(
+        "--restore-to-host",
+        required=True,
+        help="Hostname of the target machine to restore after the run.",
+    )
+    redirect_command.add_argument(
+        "--restore-to-port",
+        type=int,
+        required=True,
+        help="Port of the target machine to restore after the run.",
+    )
+
     args = parser.parse_args()
     if args.subcommand == "listen":
         await listen(args.port)
     elif args.subcommand == "spy":
         await spy(args.host)
+    elif args.subcommand == "redirect":
+        await redirect(
+            gem=args.gem,
+            original=(args.restore_to_host, args.restore_to_port),
+            redirect=(args.redirect_to_host, args.redirect_to_port),
+        )
     else:
         print(f"Unknown subcommand: {args.subcommand}")
         sys.exit(-1)
@@ -64,6 +102,21 @@ async def spy(host: str) -> None:
                 await asyncio.sleep(60)
             except asyncio.CancelledError:
                 break
+
+
+async def redirect(
+    gem: str, original=Tuple[str, int], redirect=Tuple[str, int]
+) -> None:
+    async with aiohttp.ClientSession() as session:
+        async with Monitors() as monitors:
+            monitor = await monitors.connect(gem)
+            await monitor.set_packet_destination(redirect[0], redirect[1], session)
+
+        await listen(redirect[1])
+
+        async with Monitors() as monitors:
+            monitor = await monitors.connect(gem)
+            await monitor.set_packet_destination(original[0], original[1], session)
 
 
 def on_new_monitor(monitor: Monitor):

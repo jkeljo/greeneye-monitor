@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import aiohttp
+import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, unique
+import logging
 from typing import Optional
 from siobrultech_protocols.gem.api import (
     ApiCall,
@@ -11,6 +14,29 @@ from siobrultech_protocols.gem.api import (
 from siobrultech_protocols.gem.packets import PacketFormatType
 from siobrultech_protocols.gem.protocol import BidirectionalProtocol
 import struct
+
+LOG = logging.getLogger(__name__)
+
+
+async def set_packet_destination(
+    gem_host: str, dest_host: str, dest_port: int, session: aiohttp.ClientSession
+) -> None:
+    # Set target
+    LOG.debug("%s: Setting target to %s:%d", gem_host, dest_host, dest_port)
+    async with session.get(
+        f"http://{gem_host}:8000/1?DNS={dest_host}&PTH={dest_port}"
+    ) as resp:
+        await resp.read()
+        resp.raise_for_status()
+
+    LOG.debug("Sleeping 20 seconds to simulate the GEM UI delay...")
+    await asyncio.sleep(20)
+
+    LOG.debug("%s: Exiting setup", gem_host)
+    # Exit setup mode (seems to help it actually start sending packets)
+    async with session.get(f"http://{gem_host}:8000/z") as resp:
+        await resp.read()
+        resp.raise_for_status()
 
 
 @unique

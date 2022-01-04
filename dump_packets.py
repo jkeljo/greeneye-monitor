@@ -5,6 +5,8 @@ import logging
 import sys
 from typing import Tuple
 
+from siobrultech_protocols.gem.packets import PacketFormatType
+
 from greeneye.monitor import (
     Channel,
     Monitor,
@@ -110,12 +112,16 @@ async def redirect(
     async with aiohttp.ClientSession() as session:
         async with Monitors() as monitors:
             monitor = await monitors.connect(gem)
+            old_packet_format = monitor.packet_format
+            assert old_packet_format
+            await monitor.set_packet_format(PacketFormatType.BIN48_NET_TIME)
             await monitor.set_packet_destination(redirect[0], redirect[1], session)
 
         await listen(redirect[1])
 
         async with Monitors() as monitors:
             monitor = await monitors.connect(gem)
+            await monitor.set_packet_format(old_packet_format)
             await monitor.set_packet_destination(original[0], original[1], session)
 
 

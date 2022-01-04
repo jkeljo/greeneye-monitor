@@ -8,7 +8,7 @@ from types import TracebackType
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from siobrultech_protocols.gem import api
-from siobrultech_protocols.gem.packets import Packet
+from siobrultech_protocols.gem.packets import Packet, PacketFormatType
 from siobrultech_protocols.gem.protocol import (
     ConnectionLostMessage,
     ConnectionMadeMessage,
@@ -288,6 +288,7 @@ class Monitor:
         self.temperature_sensors: List[TemperatureSensor] = []
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self.packet_send_interval: timedelta = timedelta(seconds=0)
+        self.packet_format: Optional[PacketFormatType] = None
         self._packet_interval: int = 0
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
@@ -304,6 +305,7 @@ class Monitor:
         settings = await get_all_settings(protocol, self.serial_number)
 
         self.packet_send_interval = settings.packet_send_interval
+        self.packet_format = settings.packet_format
 
         # Truncate or expand channel listing
         if len(self.channels) < settings.num_channels:
@@ -349,6 +351,14 @@ class Monitor:
         raise Exception(
             "Cannot set packet destination when connected to the monitor via something other than a TCP socket."
         )
+
+    async def set_packet_format(self, format: PacketFormatType) -> None:
+        if self._protocol:
+            await api.set_packet_format(self._protocol, format, self.serial_number)
+        else:
+            raise Exception(
+                "Cannot set packet format when not connected to the monitor."
+            )
 
     def set_packet_interval(self, seconds: int) -> None:
         self._packet_interval = seconds

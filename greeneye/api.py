@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, unique
 import logging
-from typing import Optional
+from typing import Any, Optional, Tuple
 from siobrultech_protocols.gem.api import (
     ApiCall,
     call_api,
@@ -71,7 +71,7 @@ def _parse_all_settings(response: str) -> GemSettings:
     )
     offset = 0
 
-    def unpack(format):
+    def unpack(format: str | bytes) -> Tuple[Any, ...]:
         nonlocal binary
         nonlocal offset
         size = struct.calcsize(format)

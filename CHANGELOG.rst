@@ -4,6 +4,13 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[3.0.1] - 2022-01-06
+====================
+
+Fixed
+-----
+* Added a few missing types
+
 [3.0] - 2022-01-06
 ==================
 

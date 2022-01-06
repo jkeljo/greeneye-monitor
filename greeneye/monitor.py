@@ -269,7 +269,7 @@ class Monitor:
     def __init__(self, serial_number: int) -> None:
         """serial_number is the 8 digit serial number as it appears in the GEM
         UI"""
-        self.serial_number = serial_number
+        self.serial_number: int = serial_number
         self._protocol: Optional[GemProtocol] = None
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = [
@@ -474,7 +474,7 @@ MonitorListener = Union[Callable[[Monitor], Awaitable[None]], Callable[[Monitor]
 class Monitors:
     """Keeps track of all monitors that have reported data"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.monitors: Dict[int, Monitor] = {}
         self._protocol_to_monitors: Dict[int, List[Monitor]] = {}
         self._listeners: List[MonitorListener] = []
@@ -538,8 +538,8 @@ class Monitors:
             elif isinstance(message, ConnectionMadeMessage):
                 self._protocol_to_monitors[protocol_id] = []
 
-    def _add_monitor(self, serial_number) -> Monitor:
-        LOG.info("Discovered new monitor: %s", serial_number)
+    def _add_monitor(self, serial_number: int) -> Monitor:
+        LOG.info("Discovered new monitor: %d", serial_number)
         monitor = Monitor(serial_number)
         self.monitors[serial_number] = monitor
         return monitor

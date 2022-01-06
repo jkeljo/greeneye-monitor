@@ -10,7 +10,7 @@ with open(path.join(here, "README.rst"), encoding="utf-8") as f:
 
 setup(
     name="greeneye-monitor",
-    version="2.1",
+    version="3.0",
     description="Receive data packets from GreenEye Monitor (http://www.brultech.com/greeneye/)",
     long_description=long_description,
     url="https://github.com/jkeljo/greeneye-monitor",

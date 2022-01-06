@@ -4,6 +4,29 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[3.0] - 2022-01-06
+==================
+
+New Features
+------------
+* Connect to a GEM by hostname or IP address
+* `Channel`s now know if they are configured for net metering. `kilowatt_hours` property takes that into account.
+* `TemperatureSensor`s now know what unit they are reporting.
+* Full `py.typed` info is now provided
+* Configure where the GEM sends its packets using `Monitor.set_packet_destination` 
+* Configure what format of packet the GEM sends using `Monitor.set_packet_format`
+
+Changed
+-------
+* Voltage is now reported as a `VoltageSensor` instead of a property of the `Monitor` (breaking change)
+* `Monitors.start_server` now returns `None` (breaking change)
+* `Monitors` now has a `close` method that must be called, and is now an async context manager (breaking change)
+
+Fixed
+-----
+* Closing `Monitors` will now close all existing connections
+* Deltas for values that have wrapped around are now computed correctly
+
 [2.1] - 2020-07-30
 ==================
 

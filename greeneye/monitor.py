@@ -506,9 +506,7 @@ class Monitors:
         (_, protocol) = await self._processor.connect(host)
         assert isinstance(protocol, GemProtocol)
         serial_number = await api.get_serial_number(protocol)
-        monitor = self._add_monitor(serial_number)
-        await self._set_monitor_protocol(monitor, protocol)
-        await self._notify_new_monitor(monitor)
+        monitor = await self._add_monitor(serial_number, protocol)
         return monitor
 
     async def close(self) -> None:
@@ -520,17 +518,11 @@ class Monitors:
         if isinstance(message, PacketReceivedMessage):
             packet = message.packet
             serial_number = packet.device_id * 100000 + packet.serial_number
-            new_monitor = False
             if serial_number not in self.monitors:
-                self._add_monitor(serial_number)
-                new_monitor = True
+                await self._add_monitor(serial_number, message.protool)
             monitor = self.monitors[serial_number]
 
-            await self._set_monitor_protocol(monitor, message.protocol)
             await monitor.handle_packet(packet)
-
-            if new_monitor:
-                await self._notify_new_monitor(monitor)
         else:
             if isinstance(message, ConnectionLostMessage):
                 for monitor in self._protocol_to_monitors.pop(protocol_id):
@@ -538,10 +530,12 @@ class Monitors:
             elif isinstance(message, ConnectionMadeMessage):
                 self._protocol_to_monitors[protocol_id] = []
 
-    def _add_monitor(self, serial_number: int) -> Monitor:
+    async def _add_monitor(self, serial_number: int, protocol: GemProtocol) -> Monitor:
         LOG.info("Discovered new monitor: %d", serial_number)
         monitor = Monitor(serial_number)
+        await self._set_monitor_protocol(monitor, protocol)
         self.monitors[serial_number] = monitor
+        await self._notify_new_monitor(monitor)
         return monitor
 
     async def _set_monitor_protocol(

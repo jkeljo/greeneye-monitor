@@ -4,6 +4,13 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[3.0.2] - 2022-02-20
+====================
+
+Fixed
+-----
+* Fixed an issue where we would add Monitor objects to the lookup map before they were completely initialized
+
 [3.0.1] - 2022-01-06
 ====================
 

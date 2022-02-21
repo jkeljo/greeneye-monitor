@@ -519,7 +519,7 @@ class Monitors:
             packet = message.packet
             serial_number = packet.device_id * 100000 + packet.serial_number
             if serial_number not in self.monitors:
-                await self._add_monitor(serial_number, message.protool)
+                await self._add_monitor(serial_number, message.protocol)
             monitor = self.monitors[serial_number]
 
             await monitor.handle_packet(packet)

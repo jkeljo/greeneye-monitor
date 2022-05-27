@@ -20,11 +20,11 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Home Automation",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.9",
     ],
     keywords="greeneye",
     packages=["greeneye"],
     package_data={"greeneye": ["py.typed"]},
     install_requires=["aiohttp", "siobrultech_protocols==0.5"],
-    python_requires="~=3.5",
+    python_requires="~=3.9",
 )

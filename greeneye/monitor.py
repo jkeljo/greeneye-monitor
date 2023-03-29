@@ -69,11 +69,11 @@ class PulseCounter:
 class TemperatureSensor:
     """Represents a single GEM temperature-sensor channel"""
 
-    def __init__(self, monitor: "Monitor", number: int, unit: TemperatureUnit) -> None:
+    def __init__(self, monitor: "Monitor", number: int, unit: Optional[TemperatureUnit] = None) -> None:
         self._monitor = monitor
         self.number: int = number
         self.temperature: Optional[float] = None
-        self.unit: TemperatureUnit = unit
+        self.unit: Optional[TemperatureUnit] = unit
         self._listeners: List[Listener] = []
 
     def add_listener(self, listener: Listener) -> None:
@@ -125,10 +125,10 @@ class VoltageSensor:
 class Channel:
     """Represents a single GEM CT channel"""
 
-    def __init__(self, monitor: "Monitor", number: int, net_metering: bool) -> None:
+    def __init__(self, monitor: "Monitor", number: int, net_metering: Optional[bool] = None) -> None:
         self._monitor = monitor
         self.number: int = number
-        self.net_metering: bool = net_metering
+        self.net_metering: Optional[bool] = net_metering
         self.total_absolute_watt_seconds: Optional[int] = None
         self.total_polarized_watt_seconds: Optional[int] = None
         self.absolute_watt_seconds: Optional[int] = None
@@ -141,14 +141,18 @@ class Channel:
 
     @property
     def watt_seconds(self) -> Optional[float]:
-        if not self.net_metering:
+        if self.net_metering is None:
+            return None
+        elif not self.net_metering:
             return self.absolute_watt_seconds
         else:
             return self.net_watt_seconds
 
     @property
     def kilowatt_hours(self) -> Optional[float]:
-        if not self.net_metering:
+        if self.net_metering is None:
+            return None
+        elif not self.net_metering:
             return self.absolute_kilowatt_hours
         else:
             return self.net_kilowatt_hours

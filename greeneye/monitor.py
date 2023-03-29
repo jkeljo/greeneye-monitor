@@ -446,8 +446,8 @@ class MonitorProtocolProcessor:
                     del self._protocols[id(message.protocol)]
                 try:
                     await self._listener(message)
-                except Exception as exc:
-                    LOG.exception("Exception while calling the listener!", exc)
+                except Exception:
+                    LOG.exception("Exception while calling the listener!")
                 self._queue.task_done()
         except asyncio.CancelledError:
             LOG.debug("queue consumer is getting canceled")

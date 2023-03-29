@@ -320,6 +320,7 @@ class Monitor:
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self.packet_send_interval: timedelta = timedelta(seconds=0)
         self.packet_format: Optional[PacketFormatType] = None
+        self._configured: bool = False
         self._packet_interval: int = 0
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
@@ -337,9 +338,9 @@ class Monitor:
             result = await MonitorControl.try_create(self._protocol, self.serial_number)
             if result is not None:
                 (self._control, settings) = result
-                await self._sync_with_settings(settings)
+                await self._configure_from_settings(settings)
 
-    async def _sync_with_settings(self, settings: GemSettings) -> None:
+    async def _configure_from_settings(self, settings: GemSettings) -> None:
         self.packet_send_interval = settings.packet_send_interval
         self.packet_format = settings.packet_format
 
@@ -363,6 +364,27 @@ class Monitor:
             coroutines.append(temperature_sensor.handle_settings(settings))
         for channel in self.channels:
             coroutines.append(channel.handle_settings(settings))
+        self._configured = True
+        LOG.info(f"Configured {self.serial_number} from settings API call.")
+
+        for listener in self._listeners:
+            coroutines.append(_ensure_coroutine(listener)())
+        await asyncio.gather(*coroutines)
+
+    async def _configure_from_packet(self, packet: Packet) -> None:
+        self.packet_format = packet.packet_format.type
+
+        for num in range(0, packet.num_channels):
+            self.channels.append(Channel(self, num))
+
+        for num in range(0, len(packet.temperatures)):
+            self.temperature_sensors.append(TemperatureSensor(self, num))
+
+        # Pulse counters and voltage sensors were created up front
+
+        self._configured = True
+        LOG.info(f"Configured {self.serial_number} from first packet.")
+        coroutines = []
         for listener in self._listeners:
             coroutines.append(_ensure_coroutine(listener)())
         await asyncio.gather(*coroutines)
@@ -377,6 +399,9 @@ class Monitor:
         self._listeners.remove(listener)
 
     async def handle_packet(self, packet: Packet) -> None:
+        if not self._configured:
+            await self._configure_from_packet(packet)
+
         if self._last_packet_seconds is not None:
             elapsed_seconds = packet.delta_seconds(self._last_packet_seconds)
             if elapsed_seconds < self._packet_interval:

@@ -2,6 +2,8 @@ import aiohttp
 import asyncio
 from asyncio.base_events import Server
 from datetime import datetime, timedelta
+from functools import wraps
+import inspect
 import logging
 import socket
 from types import TracebackType
@@ -362,8 +364,8 @@ class Monitor:
         for channel in self.channels:
             coroutines.append(channel.handle_settings(settings))
         for listener in self._listeners:
-            coroutines.append(asyncio.coroutine(listener)())
-        await asyncio.wait(coroutines)
+            coroutines.append(_ensure_coroutine(listener)())
+        await asyncio.gather(*coroutines)
 
     def set_packet_interval(self, seconds: int) -> None:
         self._packet_interval = seconds
@@ -392,9 +394,9 @@ class Monitor:
 
 
 async def _invoke_listeners(listeners: List[Listener]) -> None:
-    coroutines = [asyncio.coroutine(listener)() for listener in listeners]
+    coroutines = [_ensure_coroutine(listener)() for listener in listeners]
     if len(coroutines) > 0:
-        await asyncio.wait(coroutines)  # type: ignore
+        await asyncio.gather(*coroutines)  # type: ignore
 
 
 ServerListener = Callable[[PacketProtocolMessage], Awaitable[None]]
@@ -563,8 +565,16 @@ class Monitors:
         await monitor._set_protocol(protocol)
 
     async def _notify_new_monitor(self, monitor: Monitor) -> None:
-        listeners = [
-            asyncio.coroutine(listener)(monitor) for listener in self._listeners
-        ]
+        listeners = [_ensure_coroutine(listener)(monitor)
+                     for listener in self._listeners]
         if len(listeners) > 0:
-            await asyncio.wait(listeners)  # type: ignore
+            await asyncio.gather(*listeners)  # type: ignore
+
+
+def _ensure_coroutine(listener):
+    if inspect.iscoroutinefunction(listener):
+        return listener
+    else:
+        async def async_listener(*args):
+            listener(*args)
+        return async_listener

@@ -114,15 +114,19 @@ async def redirect(
             monitor = await monitors.connect(gem)
             old_packet_format = monitor.packet_format
             assert old_packet_format
-            await monitor.set_packet_format(PacketFormatType.BIN48_NET_TIME)
-            await monitor.set_packet_destination(redirect[0], redirect[1], session)
+            if not monitor.control:
+                raise Exception("Could not get monitor control interface")
+            await monitor.control.set_packet_format(PacketFormatType.BIN48_NET_TIME)
+            await monitor.control.set_packet_destination(redirect[0], redirect[1], session)
 
         await listen(redirect[1])
 
         async with Monitors() as monitors:
             monitor = await monitors.connect(gem)
-            await monitor.set_packet_format(old_packet_format)
-            await monitor.set_packet_destination(original[0], original[1], session)
+            if not monitor.control:
+                raise Exception("Could not get monitor control interface")
+            await monitor.control.set_packet_format(old_packet_format)
+            await monitor.control.set_packet_destination(original[0], original[1], session)
 
 
 def on_new_monitor(monitor: Monitor):

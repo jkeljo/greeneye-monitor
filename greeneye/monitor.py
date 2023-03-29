@@ -16,11 +16,10 @@ from siobrultech_protocols.gem.protocol import (
     PacketReceivedMessage,
 )
 
+from . import api as api_ext
 from .api import (
     GemSettings,
     TemperatureUnit,
-    get_all_settings,
-    set_packet_destination,
 )
 from .protocol import GemProtocol
 
@@ -263,6 +262,41 @@ NUM_PULSE_COUNTERS: int = 4
 NUM_TEMPERATURE_SENSORS: int = 8
 
 
+class MonitorControl:
+    """Provides access to APIs that control a monitor."""
+
+    @staticmethod
+    async def try_create(protocol: GemProtocol, serial_number: int) -> Optional[Tuple["MonitorControl", GemSettings]]:
+        try:
+            settings = await api_ext.get_all_settings(protocol, serial_number)
+            return (MonitorControl(protocol, serial_number), settings)
+        except:
+            # The remote either timed out or returned binary data, which probably indicates it's a DashBox
+            return None
+
+    def __init__(self, protocol: GemProtocol, serial_number: int) -> None:
+        self._protocol = protocol
+        self._serial_number = serial_number
+
+    async def set_packet_destination(
+        self, host: str, port: int, session: aiohttp.ClientSession
+    ) -> None:
+        peername = self._protocol.peername
+        if peername:
+            (gem_host, _) = peername
+
+            await api_ext.set_packet_destination(gem_host, host, port, session)
+            LOG.info(
+                "%d: Configured to send packets to %s:%d",
+                self._serial_number,
+                host,
+                port,
+            )
+            return
+
+    async def set_packet_format(self, format: PacketFormatType) -> None:
+        await api.set_packet_format(self._protocol, format, self._serial_number)
+
 class Monitor:
     """Represents a single GreenEye Monitor"""
 
@@ -271,6 +305,7 @@ class Monitor:
         UI"""
         self.serial_number: int = serial_number
         self._protocol: Optional[GemProtocol] = None
+        self._control: Optional[MonitorControl] = None
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = [
             PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
@@ -283,17 +318,22 @@ class Monitor:
         self._last_packet_seconds: Optional[int] = None
         self._listeners: List[Listener] = []
 
+    @property
+    def control(self) -> Optional[MonitorControl]:
+        return self._control
+
     async def _set_protocol(self, protocol: Optional[GemProtocol]) -> None:
         if self._protocol is protocol:
             return
 
         self._protocol = protocol
         if self._protocol:
-            await self._sync_with_settings(self._protocol)
+            result = await MonitorControl.try_create(self._protocol, self.serial_number)
+            if result is not None:
+                (self._control, settings) = result
+                await self._sync_with_settings(settings)
 
-    async def _sync_with_settings(self, protocol: GemProtocol) -> None:
-        settings = await get_all_settings(protocol, self.serial_number)
-
+    async def _sync_with_settings(self, settings: GemSettings) -> None:
         self.packet_send_interval = settings.packet_send_interval
         self.packet_format = settings.packet_format
 
@@ -320,35 +360,6 @@ class Monitor:
         for listener in self._listeners:
             coroutines.append(asyncio.coroutine(listener)())
         await asyncio.wait(coroutines)
-
-    async def set_packet_destination(
-        self, host: str, port: int, session: aiohttp.ClientSession
-    ) -> None:
-        if self._protocol:
-            peername = self._protocol.peername
-            if peername:
-                (gem_host, _) = peername
-
-                await set_packet_destination(gem_host, host, port, session)
-                LOG.info(
-                    "%d: Configured to send packets to %s:%d",
-                    self.serial_number,
-                    host,
-                    port,
-                )
-                return
-
-        raise Exception(
-            "Cannot set packet destination when connected to the monitor via something other than a TCP socket."
-        )
-
-    async def set_packet_format(self, format: PacketFormatType) -> None:
-        if self._protocol:
-            await api.set_packet_format(self._protocol, format, self.serial_number)
-        else:
-            raise Exception(
-                "Cannot set packet format when not connected to the monitor."
-            )
 
     def set_packet_interval(self, seconds: int) -> None:
         self._packet_interval = seconds

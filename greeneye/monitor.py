@@ -56,7 +56,7 @@ class PulseCounter:
             elapsed_seconds = packet.delta_seconds(self.seconds)
             self.pulses_per_second = (
                 (packet.delta_pulse_count(self.number, self.pulses) / elapsed_seconds)
-                if self.pulses is not None
+                if self.pulses is not None and elapsed_seconds > 0
                 else 0
             )
 
@@ -251,7 +251,7 @@ class Channel:
             # Now compute the average power over the time since the last sample
             self.watts = (
                 delta_watt_seconds_consumed - delta_watt_seconds_produced
-            ) / elapsed_seconds
+            ) / elapsed_seconds if elapsed_seconds > 0 else 0
 
         self.seconds = packet.seconds
         self.absolute_watt_seconds = new_absolute_watt_seconds

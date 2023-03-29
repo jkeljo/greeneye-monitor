@@ -423,16 +423,18 @@ class MonitorProtocolProcessor:
             port=GEM_PORT,
         )
 
-    async def start_server(self, port: int) -> None:
+    async def start_server(self, desiredPort: int = 0) -> int:
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(
             self._create_protocol,
             None,
-            port,
+            desiredPort,
             family=socket.AF_INET,
         )
 
-        LOG.info("Server started on {}".format(self._server.sockets[0].getsockname()))
+        host, port = self._server.sockets[0].getsockname()
+        LOG.info(f"Server started on {host}:{port}")
+        return port
 
     async def _consumer(self) -> None:
         try:
@@ -514,8 +516,8 @@ class Monitors:
     def remove_listener(self, listener: MonitorListener) -> None:
         self._listeners.remove(listener)
 
-    async def start_server(self, port: int) -> None:
-        await self._processor.start_server(port)
+    async def start_server(self, port: int = 0) -> int:
+        return await self._processor.start_server(port)
 
     async def connect(self, host: str) -> Monitor:
         (_, protocol) = await self._processor.connect(host)

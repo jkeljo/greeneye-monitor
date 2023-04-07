@@ -52,11 +52,19 @@ class ApiAwareClient(asyncio.Protocol):
 class TestE2E(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self._packet: bytes = read_packet('BIN32-NET.bin')
-        self._monitor: Optional[Monitor]
         self._discovered: asyncio.Condition = asyncio.Condition()
+        self._error: Exception | None = None
 
     async def onNewMonitor(self, monitor: Monitor):
-        self._monitor = monitor
+        try:
+            assert monitor
+            assert len(monitor.channels) == 32
+            assert len(monitor.pulse_counters) == 4
+            assert len(monitor.temperature_sensors) == 8
+            assert monitor.packet_format == PacketFormatType.BIN32_NET
+        except AssertionError as e:
+            self._error = e
+
         async with self._discovered:
             self._discovered.notify()
 
@@ -76,9 +84,5 @@ class TestE2E(unittest.IsolatedAsyncioTestCase):
                 await self._discovered.wait()
                 transport.close()
 
-        monitor = self._monitor
-        assert monitor
-        assert len(monitor.channels) == 32
-        assert len(monitor.pulse_counters) == 4
-        assert len(monitor.temperature_sensors) == 8
-        assert monitor.packet_format == PacketFormatType.BIN32_NET
+        if self._error:
+            raise self._error

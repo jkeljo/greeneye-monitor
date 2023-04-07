@@ -264,6 +264,38 @@ class Channel:
         await _invoke_listeners(self._listeners)
 
 
+class Aux:
+    """Represents a single ECM-1240 Aux channel."""
+
+    def __init__(self, monitor: "Monitor", number: int) -> None:
+        self._monitor = monitor
+        self.number: int = number
+        self.value: Optional[int] = None
+        self.rate_of_change: Optional[float] = None
+        self.seconds: Optional[int] = None
+        self._listeners: List[Listener] = []
+
+    def add_listener(self, listener: Listener) -> None:
+        self._listeners.append(listener)
+
+    def remove_listener(self, listener: Listener) -> None:
+        self._listeners.remove(listener)
+
+    async def handle_packet(self, packet: Packet) -> None:
+        new_value = packet.aux[self.number]
+        if new_value == self.value:
+            return
+        
+        if self.seconds is not None:
+            elapsed_seconds = packet.delta_seconds(self.seconds)
+            self.rate_of_change = (packet.delta_aux_count(self.number, self.value) / elapsed_seconds) if self.value is not None and elapsed_seconds > 0 else 0
+
+        self.seconds = packet.seconds
+        self.value = new_value
+
+        await _invoke_listeners(self._listeners)
+
+
 NUM_PULSE_COUNTERS: int = 4
 NUM_TEMPERATURE_SENSORS: int = 8
 
@@ -317,6 +349,7 @@ class Monitor:
             PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
         ]
         self.temperature_sensors: List[TemperatureSensor] = []
+        self.aux: List[Aux] = []
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self.packet_send_interval: timedelta = timedelta(seconds=0)
         self.packet_format: Optional[PacketFormatType] = None
@@ -381,6 +414,9 @@ class Monitor:
 
         for num in range(0, len(packet.temperatures)):
             self.temperature_sensors.append(TemperatureSensor(self, num))
+
+        for num in range(0, len(packet.aux)):
+            self.aux.append(Aux(self, num))
 
         # Pulse counters and voltage sensors were created up front
 

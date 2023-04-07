@@ -320,6 +320,7 @@ class Monitor:
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self.packet_send_interval: timedelta = timedelta(seconds=0)
         self.packet_format: Optional[PacketFormatType] = None
+        self.settings: Optional[GemSettings] = None
         self._configured: bool = False
         self._packet_interval: int = 0
         self._last_packet_seconds: Optional[int] = None
@@ -341,6 +342,7 @@ class Monitor:
                 await self._configure_from_settings(settings)
 
     async def _configure_from_settings(self, settings: GemSettings) -> None:
+        self.settings = settings
         self.packet_send_interval = settings.packet_send_interval
         self.packet_format = settings.packet_format
 

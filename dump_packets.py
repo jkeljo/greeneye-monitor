@@ -158,7 +158,7 @@ def on_new_temperature_sensor(temp: TemperatureSensor):
 
 def print_monitor(monitor: Monitor):
     print(
-        f"Monitor {monitor.serial_number} sending packets every {monitor.packet_send_interval}"
+        f"Monitor {monitor.serial_number} ({monitor.type}) sending packets every {monitor.packet_send_interval}"
     )
 
 

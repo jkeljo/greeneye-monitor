@@ -1,3 +1,4 @@
+from enum import Enum
 import aiohttp
 import asyncio
 from asyncio.base_events import Server
@@ -335,6 +336,13 @@ class MonitorControl:
     async def set_packet_format(self, format: PacketFormatType) -> None:
         await api.set_packet_format(self._protocol, format, self._serial_number)
 
+
+class MonitorType(Enum):
+    ECM_1220 = 1
+    ECM_1240 = 2
+    GEM = 3
+
+
 class Monitor:
     """Represents a single GreenEye Monitor"""
 
@@ -362,6 +370,15 @@ class Monitor:
     @property
     def control(self) -> Optional[MonitorControl]:
         return self._control
+    
+    @property
+    def type(self) -> MonitorType:
+        if self.packet_format == PacketFormatType.ECM_1220:
+            return MonitorType.ECM_1220
+        elif self.packet_format == PacketFormatType.ECM_1240:
+            return MonitorType.ECM_1240
+        else:
+            return MonitorType.GEM
 
     async def _set_protocol(self, protocol: Optional[GemProtocol]) -> None:
         if self._protocol is protocol:

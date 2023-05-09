@@ -353,9 +353,7 @@ class Monitor:
         self._protocol: Optional[GemProtocol] = None
         self._control: Optional[MonitorControl] = None
         self.channels: List[Channel] = []
-        self.pulse_counters: List[PulseCounter] = [
-            PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
-        ]
+        self.pulse_counters: List[PulseCounter] = []
         self.temperature_sensors: List[TemperatureSensor] = []
         self.aux: List[Aux] = []
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
@@ -408,7 +406,10 @@ class Monitor:
                 TemperatureSensor(self, num, settings.temperature_unit)
             )
 
-        # Pulse counters and voltage sensors were created up front
+        if self.type == MonitorType.GEM:
+            self.pulse_counters = [PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)]
+                    
+        # Voltage sensor was created up front
 
         # Now update settings if needed and trigger listeners
         coroutines = []
@@ -435,7 +436,10 @@ class Monitor:
         for num in range(0, len(packet.aux)):
             self.aux.append(Aux(self, num))
 
-        # Pulse counters and voltage sensors were created up front
+        if self.type == MonitorType.GEM:
+            self.pulse_counters = [PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)]
+                    
+        # Voltage sensor was created up front
 
         self._configured = True
         LOG.info(f"Configured {self.serial_number} from first packet.")

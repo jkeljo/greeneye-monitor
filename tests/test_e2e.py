@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from siobrultech_protocols.gem.packets import PacketFormatType
 import socket
 from typing import List, cast, Optional
@@ -11,8 +12,8 @@ from .packet_test_data import read_packet
 
 
 class ApiUnawareClient(asyncio.Protocol):
-    def __init__(self):
-        self._packet: bytes = read_packet('BIN32-NET.bin')
+    def __init__(self, packet: str):
+        self._packet: bytes = read_packet(packet)
         self._transport: Optional[asyncio.WriteTransport] = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -71,7 +72,7 @@ class TestGEME2E(unittest.IsolatedAsyncioTestCase):
         await self.assertMonitorConfiguredProperlyWithClient(ApiAwareClient)
 
     async def testMonitorConfiguredProperlyWhenClientIgnoresAPI(self):
-        await self.assertMonitorConfiguredProperlyWithClient(ApiUnawareClient)
+        await self.assertMonitorConfiguredProperlyWithClient(functools.partial(ApiUnawareClient, packet='BIN32-NET.bin'))
 
     async def assertMonitorConfiguredProperlyWithClient(self, client):
         loop = asyncio.get_event_loop()
@@ -86,7 +87,7 @@ class TestGEME2E(unittest.IsolatedAsyncioTestCase):
         if self._error:
             raise self._error
         
-class TestECME2E(unittest.TestCase):
+class TestECME2E(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self._packet: bytes = read_packet('ECM-1240.bin')
         self._discovered: asyncio.Condition = asyncio.Condition()
@@ -106,8 +107,8 @@ class TestECME2E(unittest.TestCase):
         async with self._discovered:
             self._discovered.notify()
 
-    async def testMonitorConfiguredProperlyWhenClientIgnoresAPI(self):
-        await self.assertMonitorConfiguredProperlyWithClient(ApiUnawareClient)
+    async def testMonitorConfiguredProperlyWhenClientIgnoresAPI(self) -> None:
+        await self.assertMonitorConfiguredProperlyWithClient(functools.partial(ApiUnawareClient, packet='ECM-1240.bin'))
 
     async def assertMonitorConfiguredProperlyWithClient(self, client):
         loop = asyncio.get_event_loop()

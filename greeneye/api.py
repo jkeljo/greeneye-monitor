@@ -8,11 +8,10 @@ from enum import Enum, unique
 import logging
 from typing import Any, Optional, Tuple
 from siobrultech_protocols.gem.api import (
-    ApiCall,
     call_api,
 )
 from siobrultech_protocols.gem.packets import PacketFormatType
-from siobrultech_protocols.gem.protocol import BidirectionalProtocol
+from siobrultech_protocols.gem.protocol import ApiCall, BidirectionalProtocol
 import struct
 
 LOG = logging.getLogger(__name__)
@@ -50,14 +49,18 @@ class GemSettings:
     packet_format: PacketFormatType | None
     packet_send_interval: timedelta
     num_channels: int
-    temperature_unit: TemperatureUnit
-    channel_net_metering: list[bool]
+    temperature_unit: TemperatureUnit | None
+    channel_net_metering: list[bool | None]
 
 
 async def get_all_settings(
     protocol: BidirectionalProtocol, serial_number: Optional[int] = None
 ) -> GemSettings:
     async with call_api(_GET_ALL_SETTINGS, protocol, serial_number) as f:
+        return await f(None)
+    
+async def send_one_packet(protocol: BidirectionalProtocol, serial_number: Optional[int] = None) -> None:
+    async with call_api(_SEND_ONE_PACKET, protocol, serial_number) as f:
         return await f(None)
 
 
@@ -147,8 +150,51 @@ def _parse_all_settings(response: str) -> GemSettings:
         channel_net_metering=channel_net_metering,
     )
 
+def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
+    offset = 0
+    def unpack(format: str | bytes) -> Tuple[Any, ...]:
+        nonlocal binary
+        nonlocal offset
+        size = struct.calcsize(format)
+        result = struct.unpack_from(format, binary, offset)
+        offset += size
+        return result
+    
+    actual_sum = sum(binary[:32])
+
+    _ct1_type = unpack("B")[0]
+    _ct1_range = unpack("B")[0]
+    _ct2_type = unpack("B")[0]
+    _ct2_range = unpack("B")[0]
+    _pt_type = unpack("B")[0]
+    _pt_range = unpack("B")[0]
+    packet_send_interval = timedelta(seconds = unpack("B")[0])
+    _data_logger_interval = unpack("B")[0]
+    _firmware_version = unpack(">H")[0]
+    _device_id = unpack("B")[0]
+    serial_number = unpack(">H")[0]
+    unpack("16x")
+    _trigger_value = unpack("<H")[0]
+    zero = unpack("B")[0]
+    assert zero == 0
+    checksum = unpack("B")[0]
+    assert checksum == actual_sum % 256
+
+    return GemSettings(
+        packet_format = PacketFormatType.ECM_1220,
+        packet_send_interval = packet_send_interval,
+        num_channels=2,
+        temperature_unit=None,
+        channel_net_metering=[None, None]
+    )
+        
+
 
 _CMD_GET_ALL_SETTINGS = "^^^RQSALL"
 _GET_ALL_SETTINGS = ApiCall[None, GemSettings](
-    formatter=lambda _: _CMD_GET_ALL_SETTINGS, parser=_parse_all_settings
+    gem_formatter=lambda _: _CMD_GET_ALL_SETTINGS, gem_parser=_parse_all_settings,
+    ecm_formatter=lambda _: [b"\xfc", b"SET", b"RCV"], ecm_parser=_parse_all_ecm_settings,
 )
+
+_CMD_SEND_ONE_PACKET = '^^^APISPK'
+_SEND_ONE_PACKET = ApiCall[None, None](gem_formatter = lambda _: _CMD_SEND_ONE_PACKET, gem_parser=None, ecm_formatter=None, ecm_parser=None)

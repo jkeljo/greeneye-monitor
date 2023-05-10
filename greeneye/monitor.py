@@ -13,6 +13,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 from siobrultech_protocols.gem import api
 from siobrultech_protocols.gem.packets import Packet, PacketFormatType
 from siobrultech_protocols.gem.protocol import (
+    ApiType,
     ConnectionLostMessage,
     ConnectionMadeMessage,
     PacketProtocolMessage,
@@ -308,6 +309,7 @@ class MonitorControl:
     async def try_create(protocol: GemProtocol, serial_number: int) -> Optional[Tuple["MonitorControl", GemSettings]]:
         try:
             settings = await api_ext.get_all_settings(protocol, serial_number)
+            #await api_ext.send_one_packet(protocol, serial_number)
             return (MonitorControl(protocol, serial_number), settings)
         except:
             # The remote either timed out or returned binary data, which probably indicates it's a DashBox
@@ -400,13 +402,13 @@ class Monitor:
         for num in range(len(self.channels), settings.num_channels):
             self.channels.append(Channel(self, num, settings.channel_net_metering[num]))
 
-        # Initialize temperature sensors if needed
-        for num in range(len(self.temperature_sensors), NUM_TEMPERATURE_SENSORS):
-            self.temperature_sensors.append(
-                TemperatureSensor(self, num, settings.temperature_unit)
-            )
-
         if self.type == MonitorType.GEM:
+            # Initialize temperature sensors if needed
+            for num in range(len(self.temperature_sensors), NUM_TEMPERATURE_SENSORS):
+                self.temperature_sensors.append(
+                    TemperatureSensor(self, num, settings.temperature_unit)
+                )
+
             self.pulse_counters = [PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)]
                     
         # Voltage sensor was created up front
@@ -538,6 +540,7 @@ class MonitorProtocolProcessor:
             raise
 
     def _create_protocol(self) -> GemProtocol:
+        # TODO: Set API type to GEM when connecting
         protocol = GemProtocol(self._queue)
         self._protocols[id(protocol)] = protocol
         return protocol

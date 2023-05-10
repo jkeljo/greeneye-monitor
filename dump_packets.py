@@ -10,6 +10,7 @@ from siobrultech_protocols.gem.packets import PacketFormatType
 from greeneye.monitor import (
     Channel,
     Monitor,
+    MonitorType,
     Monitors,
     PulseCounter,
     TemperatureSensor,
@@ -133,6 +134,10 @@ def on_new_monitor(monitor: Monitor):
     monitor.add_listener(lambda: print_monitor(monitor))
 
     monitor.voltage_sensor.add_listener(lambda: print_voltage(monitor.voltage_sensor))
+
+    if monitor.type != MonitorType.GEM:
+        for channel in monitor.channels:
+            channel.net_metering = False
 
     for channel in monitor.channels:
         on_new_channel(channel)

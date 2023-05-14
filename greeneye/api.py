@@ -5,13 +5,14 @@ import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, unique
+from itertools import chain
 import logging
 from typing import Any, Optional, Tuple
 from siobrultech_protocols.gem.api import (
     call_api,
 )
 from siobrultech_protocols.gem.packets import PacketFormatType
-from siobrultech_protocols.gem.protocol import ApiCall, BidirectionalProtocol
+from siobrultech_protocols.gem.protocol import ApiCall, ApiType, BidirectionalProtocol
 import struct
 
 LOG = logging.getLogger(__name__)
@@ -51,6 +52,8 @@ class GemSettings:
     num_channels: int
     temperature_unit: TemperatureUnit | None
     channel_net_metering: list[bool | None]
+    ct_types: list[int]
+    ct_ranges: list[int]
 
 
 async def get_all_settings(
@@ -62,6 +65,26 @@ async def get_all_settings(
 async def send_one_packet(protocol: BidirectionalProtocol, serial_number: Optional[int] = None) -> None:
     async with call_api(_SEND_ONE_PACKET, protocol, serial_number) as f:
         return await f(None)
+
+async def set_ct_type(protocol: BidirectionalProtocol, channel: int, type: int, serial_number: Optional[int] = None) -> None:
+    assert protocol.api_type == ApiType.GEM
+    async with call_api(_SET_CT_TYPE, protocol, serial_number) as f:
+        await f((channel, type))
+
+async def set_ct_range(protocol: BidirectionalProtocol, channel: int, range: int, serial_number: Optional[int] = None) -> None:
+    assert protocol.api_type == ApiType.GEM
+    async with call_api(_SET_CT_RANGE, protocol, serial_number) as f:
+        await f((channel, range))
+
+async def set_ct_type_and_range(protocol: BidirectionalProtocol, channel: int, type: int, range: int, serial_number: Optional[int] = None) -> None:
+    if protocol.api_type == ApiType.GEM:
+        await set_ct_type(protocol, channel, type, serial_number)
+        await set_ct_range(protocol, channel, range, serial_number)
+    elif protocol.api_type == ApiType.ECM:
+        async with call_api(_SET_CT_TYPE_AND_RANGE, protocol, serial_number) as f:
+            await f((channel, type, range))
+    else:
+        assert False
 
 
 _ALL_SETTINGS_RESPONSE_PREFIX = "ALL\r\n"
@@ -87,8 +110,8 @@ def _parse_all_settings(response: str) -> GemSettings:
     _channel_options = unpack("x48B")
     channel_net_metering = [options & 0x40 == 0 for options in _channel_options]
     channel_polarity_toggled = [options & 0x80 == 0x80 for options in _channel_options]
-    _ct_types = unpack("48B")
-    _ct_ranges = unpack("24B")  # These are actually one nybble per CT
+    ct_types = list(unpack("48B"))
+    ct_ranges = list(chain.from_iterable([[b & 0x0F, (b & 0xF0) >> 4] for b in unpack("24B")]))  # These are actually one nybble per CT
     _pt_type = unpack("B")[0]
     _pt_range = unpack("B")[0]
     _packet_format_int = unpack("B")[0]
@@ -148,6 +171,8 @@ def _parse_all_settings(response: str) -> GemSettings:
         num_channels=num_channels,
         temperature_unit=temperature_unit,
         channel_net_metering=channel_net_metering,
+        ct_types=ct_types,
+        ct_ranges=ct_ranges,
     )
 
 def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
@@ -162,10 +187,12 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
     
     actual_sum = sum(binary[:32])
 
-    _ct1_type = unpack("B")[0]
-    _ct1_range = unpack("B")[0]
-    _ct2_type = unpack("B")[0]
-    _ct2_range = unpack("B")[0]
+    ct1_type = unpack("B")[0]
+    ct1_range = unpack("B")[0]
+    ct2_type = unpack("B")[0]
+    ct2_range = unpack("B")[0]
+    ct_types = [ct1_type, ct2_type]
+    ct_ranges = [ct1_range, ct2_range]
     _pt_type = unpack("B")[0]
     _pt_range = unpack("B")[0]
     packet_send_interval = timedelta(seconds = unpack("B")[0])
@@ -185,7 +212,9 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
         packet_send_interval = packet_send_interval,
         num_channels=2,
         temperature_unit=None,
-        channel_net_metering=[None, None]
+        channel_net_metering=[None, None],
+        ct_types=ct_types,
+        ct_ranges=ct_ranges,
     )
         
 
@@ -198,3 +227,7 @@ _GET_ALL_SETTINGS = ApiCall[None, GemSettings](
 
 _CMD_SEND_ONE_PACKET = '^^^APISPK'
 _SEND_ONE_PACKET = ApiCall[None, None](gem_formatter = lambda _: _CMD_SEND_ONE_PACKET, gem_parser=None, ecm_formatter=None, ecm_parser=None)
+
+_SET_CT_TYPE = ApiCall[(int, int), None](gem_formatter = lambda args: f"^^^CH{args[0]:02}TYP{args[1]}", gem_parser=None, ecm_formatter=None, ecm_parser=None)
+_SET_CT_RANGE = ApiCall[(int, int), None](gem_formatter = lambda args: f"^^^CH{args[0]:02}RNG{args[1]}", gem_parser = None, ecm_formatter=None, ecm_parser=None)
+_SET_CT_TYPE_AND_RANGE = ApiCall[(int, int, int), None](gem_formatter=None, gem_parser=None, ecm_formatter=lambda args: [b"\xfc", b"SET", f"CT{args[0]}".encode(), b"TYP", bytes([args[1]]), b"RNG", bytes([args[2]])], ecm_parser=None)

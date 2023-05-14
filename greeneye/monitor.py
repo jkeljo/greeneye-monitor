@@ -129,7 +129,7 @@ class VoltageSensor:
 class Channel:
     """Represents a single GEM CT channel"""
 
-    def __init__(self, monitor: "Monitor", number: int, net_metering: Optional[bool] = None) -> None:
+    def __init__(self, monitor: "Monitor", number: int, net_metering: Optional[bool] = None, control: Optional['MonitorControl'] = None) -> None:
         self._monitor = monitor
         self.number: int = number
         self.net_metering: Optional[bool] = net_metering
@@ -141,6 +141,9 @@ class Channel:
         self.seconds: Optional[int] = None
         self.watts: Optional[float] = None
         self.timestamp: Optional[datetime] = None
+        self.ct_type: Optional[int] = None
+        self.ct_range: Optional[int] = None
+        self.control: Optional[MonitorControl] = control
         self._listeners: List[Listener] = []
 
     @property
@@ -188,6 +191,41 @@ class Channel:
             return None
 
         return self.polarized_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
+    
+    async def set_ct_type(self, type: int) -> None:
+        assert self.control
+        assert self.control.api_type
+        assert self.ct_type is not None
+        assert self.ct_range is not None
+        if self.ct_type == type:
+            return
+        
+        if self.control.api_type == ApiType.GEM:
+            await self.control.set_ct_type(channel=self.number + 1, type=type)
+        elif self.control.api_type == ApiType.ECM:
+            await self.control.set_ct_type_and_range(channel=self.number + 1, type=type, range=self.ct_range)
+        else:
+            assert False
+
+        self.ct_type = type
+        
+    async def set_ct_range(self, range: int) -> None:
+        assert self.control
+        assert self.control.api_type
+        assert self.ct_type is not None
+        assert self.ct_range is not None
+        if self.ct_range == range:
+            return
+        
+        if self.control.api_type == ApiType.GEM:
+            await self.control.set_ct_range(channel=self.number + 1, range=range)
+        elif self.control.api_type == ApiType.ECM:
+            await self.control.set_ct_type_and_range(channel=self.number + 1, type=self.ct_type, range=range)
+        else:
+            assert False
+
+        self.ct_range = range
+        
 
     def add_listener(self, listener: Listener) -> None:
         self._listeners.append(listener)
@@ -197,10 +235,14 @@ class Channel:
 
     async def handle_settings(self, settings: GemSettings) -> None:
         net_metering = settings.channel_net_metering[self.number]
-        if net_metering == self.net_metering:
+        ct_type = settings.ct_types[self.number]
+        ct_range = settings.ct_ranges[self.number]
+        if net_metering == self.net_metering and ct_type == self.ct_type and ct_range == self.ct_range:
             return
-
+        
         self.net_metering = net_metering
+        self.ct_type = ct_type
+        self.ct_range = ct_range
         await _invoke_listeners(self._listeners)
 
     async def handle_packet(self, packet: Packet) -> None:
@@ -319,6 +361,19 @@ class MonitorControl:
         self._protocol = protocol
         self._serial_number = serial_number
 
+    @property
+    def api_type(self) -> ApiType:
+        return self._protocol.api_type
+    
+    async def set_ct_type(self, channel: int, type: int) -> None:
+        await api_ext.set_ct_type(self._protocol, channel=channel,type=type, serial_number=self._serial_number)
+
+    async def set_ct_range(self, channel: int, range: int) -> None:
+        await api_ext.set_ct_range(self._protocol, channel=channel, range=range, serial_number=self._serial_number)
+
+    async def set_ct_type_and_range(self, channel: int, type: int, range: int) -> None:
+        await api_ext.set_ct_type_and_range(self._protocol, channel=channel, type=type, range=range, serial_number=self._serial_number)
+
     async def set_packet_destination(
         self, host: str, port: int, session: aiohttp.ClientSession
     ) -> None:
@@ -389,9 +444,9 @@ class Monitor:
             result = await MonitorControl.try_create(self._protocol, self.serial_number)
             if result is not None:
                 (self._control, settings) = result
-                await self._configure_from_settings(settings)
+                await self._configure_from_settings(settings, self._control)
 
-    async def _configure_from_settings(self, settings: GemSettings) -> None:
+    async def _configure_from_settings(self, settings: GemSettings, control: MonitorControl) -> None:
         self.settings = settings
         self.packet_send_interval = settings.packet_send_interval
         self.packet_format = settings.packet_format
@@ -400,7 +455,7 @@ class Monitor:
         if len(self.channels) < settings.num_channels:
             del self.channels[settings.num_channels :]
         for num in range(len(self.channels), settings.num_channels):
-            self.channels.append(Channel(self, num, settings.channel_net_metering[num]))
+            self.channels.append(Channel(self, num, settings.channel_net_metering[num], control))
 
         if self.type == MonitorType.GEM:
             # Initialize temperature sensors if needed

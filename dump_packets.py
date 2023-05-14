@@ -169,11 +169,13 @@ def print_voltage(voltage_sensor: VoltageSensor):
 def print_channel(channel: Channel):
     if channel.watts and channel.kilowatt_hours:
         print(
-            "Channel {0}: {1:.0f} W ({2:.3f} kWh {3})".format(
+            "Channel {0} (type={4} range={5}): {1:.0f} W ({2:.3f} kWh {3})".format(
                 channel.number,
                 channel.watts,
                 channel.kilowatt_hours,
                 "net" if channel.net_metering else "abs",
+                channel.ct_type,
+                channel.ct_range,
             )
         )
 

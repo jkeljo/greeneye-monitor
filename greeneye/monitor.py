@@ -348,9 +348,9 @@ class MonitorControl:
     """Provides access to APIs that control a monitor."""
 
     @staticmethod
-    async def try_create(protocol: GemProtocol, serial_number: int) -> Optional[Tuple["MonitorControl", GemSettings]]:
+    async def try_create(protocol: GemProtocol, serial_number: int, api_timeout: timedelta | None) -> Optional[Tuple["MonitorControl", GemSettings]]:
         try:
-            settings = await api_ext.get_all_settings(protocol, serial_number)
+            settings = await api_ext.get_all_settings(protocol, serial_number, api_timeout)
             #await api_ext.send_one_packet(protocol, serial_number)
             return (MonitorControl(protocol, serial_number), settings)
         except:
@@ -435,13 +435,13 @@ class Monitor:
         else:
             return MonitorType.GEM
 
-    async def _set_protocol(self, protocol: Optional[GemProtocol]) -> None:
+    async def _set_protocol(self, protocol: Optional[GemProtocol], api_timeout: timedelta | None = None) -> None:
         if self._protocol is protocol:
             return
 
         self._protocol = protocol
         if self._protocol:
-            result = await MonitorControl.try_create(self._protocol, self.serial_number)
+            result = await MonitorControl.try_create(self._protocol, self.serial_number, api_timeout)
             if result is not None:
                 (self._control, settings) = result
                 await self._configure_from_settings(settings, self._control)
@@ -548,13 +548,14 @@ class MonitorProtocolProcessor:
     """Listens for connections from GEMs and notifies a listener of each
     packet."""
 
-    def __init__(self, listener: ServerListener) -> None:
+    def __init__(self, listener: ServerListener, send_packet_delay: bool) -> None:
         self._consumer_task = asyncio.ensure_future(self._consumer())
         LOG.debug("Packet processor started")
         self._listener = listener
         self._queue: asyncio.Queue[PacketProtocolMessage] = asyncio.Queue()
         self._server: Optional[Server] = None
         self._protocols: Dict[int, GemProtocol] = {}
+        self._send_packet_delay = send_packet_delay
 
     async def connect(
         self, hostname: str
@@ -596,7 +597,7 @@ class MonitorProtocolProcessor:
 
     def _create_protocol(self) -> GemProtocol:
         # TODO: Set API type to GEM when connecting
-        protocol = GemProtocol(self._queue)
+        protocol = GemProtocol(self._queue, send_packet_delay=self._send_packet_delay)
         self._protocols[id(protocol)] = protocol
         return protocol
 
@@ -635,13 +636,15 @@ MonitorListener = Union[Callable[[Monitor], Awaitable[None]], Callable[[Monitor]
 class Monitors:
     """Keeps track of all monitors that have reported data"""
 
-    def __init__(self) -> None:
+    def __init__(self, send_packet_delay: bool = True, api_timeout: timedelta | None = None) -> None:
         self.monitors: Dict[int, Monitor] = {}
         self._protocol_to_monitors: Dict[int, List[Monitor]] = {}
         self._listeners: List[MonitorListener] = []
         self._processor: MonitorProtocolProcessor = MonitorProtocolProcessor(
-            self._handle_message
+            self._handle_message,
+            send_packet_delay=send_packet_delay
         )
+        self._api_timeout: timedelta | None = api_timeout
 
     async def __aenter__(self) -> "Monitors":
         return self
@@ -666,7 +669,7 @@ class Monitors:
     async def connect(self, host: str) -> Monitor:
         (_, protocol) = await self._processor.connect(host)
         assert isinstance(protocol, GemProtocol)
-        serial_number = await api.get_serial_number(protocol)
+        serial_number = await api.get_serial_number(protocol, timeout = self._api_timeout)
         monitor = await self._add_monitor(serial_number, protocol)
         return monitor
 
@@ -706,7 +709,7 @@ class Monitors:
     ) -> None:
         protocol_id = id(protocol)
         self._protocol_to_monitors[protocol_id].append(monitor)
-        await monitor._set_protocol(protocol)
+        await monitor._set_protocol(protocol, api_timeout = self._api_timeout)
 
     async def _notify_new_monitor(self, monitor: Monitor) -> None:
         listeners = [_ensure_coroutine(listener)(monitor)

@@ -57,9 +57,9 @@ class GemSettings:
 
 
 async def get_all_settings(
-    protocol: BidirectionalProtocol, serial_number: Optional[int] = None
+    protocol: BidirectionalProtocol, serial_number: Optional[int] = None, timeout: timedelta | None = None
 ) -> GemSettings:
-    async with call_api(_GET_ALL_SETTINGS, protocol, serial_number) as f:
+    async with call_api(_GET_ALL_SETTINGS, protocol, serial_number, timeout) as f:
         return await f(None)
     
 async def send_one_packet(protocol: BidirectionalProtocol, serial_number: Optional[int] = None) -> None:

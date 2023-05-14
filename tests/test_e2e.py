@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 import functools
 from siobrultech_protocols.gem.packets import PacketFormatType
 import socket
@@ -76,7 +77,7 @@ class TestGEME2E(unittest.IsolatedAsyncioTestCase):
 
     async def assertMonitorConfiguredProperlyWithClient(self, client):
         loop = asyncio.get_event_loop()
-        async with Monitors() as monitors:
+        async with Monitors(send_packet_delay=False, api_timeout=timedelta(seconds=0)) as monitors:
             monitors.add_listener(self.onNewMonitor)
             port = await monitors.start_server()
             async with self._discovered:
@@ -112,7 +113,7 @@ class TestECME2E(unittest.IsolatedAsyncioTestCase):
 
     async def assertMonitorConfiguredProperlyWithClient(self, client):
         loop = asyncio.get_event_loop()
-        async with Monitors() as monitors:
+        async with Monitors(send_packet_delay=False, api_timeout=timedelta(seconds=0)) as monitors:
             monitors.add_listener(self.onNewMonitor)
             port = await monitors.start_server()
             async with self._discovered:

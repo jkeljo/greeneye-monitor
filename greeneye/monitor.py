@@ -578,6 +578,7 @@ class Monitor:
     async def handle_packet(self, packet: Packet) -> None:
         if not self._configured:
             await self._configure_from_packet(packet)
+        self.packet_format = packet.packet_format.type
 
         if self._last_packet_seconds is not None:
             elapsed_seconds = packet.delta_seconds(self._last_packet_seconds)

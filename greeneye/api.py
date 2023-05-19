@@ -268,13 +268,13 @@ _SEND_ONE_PACKET = ApiCall[None, None](
 )
 
 _SET_CT_TYPE = ApiCall[(int, int), None](
-    gem_formatter=lambda args: f"^^^CH{args[0]:02}TYP{args[1]}",
+    gem_formatter=lambda args: f"^^^C{args[0]:02}TYP{args[1]}",
     gem_parser=None,
     ecm_formatter=None,
     ecm_parser=None,
 )
 _SET_CT_RANGE = ApiCall[(int, int), None](
-    gem_formatter=lambda args: f"^^^CH{args[0]:02}RNG{args[1]}",
+    gem_formatter=lambda args: f"^^^C{args[0]:02}RNG{args[1]}",
     gem_parser=None,
     ecm_formatter=None,
     ecm_parser=None,

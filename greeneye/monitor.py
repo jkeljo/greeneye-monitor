@@ -422,6 +422,14 @@ class MonitorControl:
             serial_number=self._serial_number,
         )
 
+    async def set_packet_send_interval(self, seconds: int) -> None:
+        assert seconds > 0 and seconds <= 255
+        await api.set_packet_send_interval(
+            self._protocol,
+            send_interval_seconds=seconds,
+            serial_number=self._serial_number,
+        )
+
     async def set_packet_destination(
         self, host: str, port: int, session: aiohttp.ClientSession
     ) -> None:
@@ -565,6 +573,9 @@ class Monitor:
         for listener in self._listeners:
             coroutines.append(_ensure_coroutine(listener)())
         await asyncio.gather(*coroutines)
+
+    async def set_packet_send_interval(self, seconds: int) -> None:
+        await self._control.set_packet_send_interval(seconds)
 
     def set_packet_interval(self, seconds: int) -> None:
         self._packet_interval = seconds

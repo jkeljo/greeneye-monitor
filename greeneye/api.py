@@ -114,7 +114,9 @@ async def set_ct_type_and_range(
 _ALL_SETTINGS_RESPONSE_PREFIX = "ALL\r\n"
 
 
-def _parse_all_settings(response: str) -> GemSettings:
+def _parse_all_settings(response: str) -> GemSettings | None:
+    if len(response) < 1542:
+        return None
     assert response.startswith(_ALL_SETTINGS_RESPONSE_PREFIX)
     binary = bytes.fromhex(
         response[len(_ALL_SETTINGS_RESPONSE_PREFIX) :].replace(",", "")
@@ -202,7 +204,10 @@ def _parse_all_settings(response: str) -> GemSettings:
     )
 
 
-def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
+def _parse_all_ecm_settings(binary: bytes) -> GemSettings | None:
+    if len(binary) < 33:
+        return None
+
     offset = 0
 
     def unpack(format: str | bytes) -> Tuple[Any, ...]:

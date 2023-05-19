@@ -57,26 +57,50 @@ class GemSettings:
 
 
 async def get_all_settings(
-    protocol: BidirectionalProtocol, serial_number: Optional[int] = None, timeout: timedelta | None = None
+    protocol: BidirectionalProtocol,
+    serial_number: Optional[int] = None,
+    timeout: timedelta | None = None,
 ) -> GemSettings:
     async with call_api(_GET_ALL_SETTINGS, protocol, serial_number, timeout) as f:
         return await f(None)
-    
-async def send_one_packet(protocol: BidirectionalProtocol, serial_number: Optional[int] = None) -> None:
+
+
+async def send_one_packet(
+    protocol: BidirectionalProtocol, serial_number: Optional[int] = None
+) -> None:
     async with call_api(_SEND_ONE_PACKET, protocol, serial_number) as f:
         return await f(None)
 
-async def set_ct_type(protocol: BidirectionalProtocol, channel: int, type: int, serial_number: Optional[int] = None) -> None:
+
+async def set_ct_type(
+    protocol: BidirectionalProtocol,
+    channel: int,
+    type: int,
+    serial_number: Optional[int] = None,
+) -> None:
     assert protocol.api_type == ApiType.GEM
     async with call_api(_SET_CT_TYPE, protocol, serial_number) as f:
         await f((channel, type))
 
-async def set_ct_range(protocol: BidirectionalProtocol, channel: int, range: int, serial_number: Optional[int] = None) -> None:
+
+async def set_ct_range(
+    protocol: BidirectionalProtocol,
+    channel: int,
+    range: int,
+    serial_number: Optional[int] = None,
+) -> None:
     assert protocol.api_type == ApiType.GEM
     async with call_api(_SET_CT_RANGE, protocol, serial_number) as f:
         await f((channel, range))
 
-async def set_ct_type_and_range(protocol: BidirectionalProtocol, channel: int, type: int, range: int, serial_number: Optional[int] = None) -> None:
+
+async def set_ct_type_and_range(
+    protocol: BidirectionalProtocol,
+    channel: int,
+    type: int,
+    range: int,
+    serial_number: Optional[int] = None,
+) -> None:
     if protocol.api_type == ApiType.GEM:
         await set_ct_type(protocol, channel, type, serial_number)
         await set_ct_range(protocol, channel, range, serial_number)
@@ -111,7 +135,9 @@ def _parse_all_settings(response: str) -> GemSettings:
     channel_net_metering = [options & 0x40 == 0 for options in _channel_options]
     channel_polarity_toggled = [options & 0x80 == 0x80 for options in _channel_options]
     ct_types = list(unpack("48B"))
-    ct_ranges = list(chain.from_iterable([[b & 0x0F, (b & 0xF0) >> 4] for b in unpack("24B")]))  # These are actually one nybble per CT
+    ct_ranges = list(
+        chain.from_iterable([[b & 0x0F, (b & 0xF0) >> 4] for b in unpack("24B")])
+    )  # These are actually one nybble per CT
     _pt_type = unpack("B")[0]
     _pt_range = unpack("B")[0]
     _packet_format_int = unpack("B")[0]
@@ -175,8 +201,10 @@ def _parse_all_settings(response: str) -> GemSettings:
         ct_ranges=ct_ranges,
     )
 
+
 def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
     offset = 0
+
     def unpack(format: str | bytes) -> Tuple[Any, ...]:
         nonlocal binary
         nonlocal offset
@@ -184,7 +212,7 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
         result = struct.unpack_from(format, binary, offset)
         offset += size
         return result
-    
+
     actual_sum = sum(binary[:32])
 
     ct1_type = unpack("B")[0]
@@ -195,7 +223,7 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
     ct_ranges = [ct1_range, ct2_range]
     _pt_type = unpack("B")[0]
     _pt_range = unpack("B")[0]
-    packet_send_interval = timedelta(seconds = unpack("B")[0])
+    packet_send_interval = timedelta(seconds=unpack("B")[0])
     _data_logger_interval = unpack("B")[0]
     _firmware_version = unpack(">H")[0]
     _device_id = unpack("B")[0]
@@ -208,26 +236,55 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings:
     assert checksum == actual_sum % 256
 
     return GemSettings(
-        packet_format = PacketFormatType.ECM_1220,
-        packet_send_interval = packet_send_interval,
+        packet_format=PacketFormatType.ECM_1220,
+        packet_send_interval=packet_send_interval,
         num_channels=2,
         temperature_unit=None,
         channel_net_metering=[None, None],
         ct_types=ct_types,
         ct_ranges=ct_ranges,
     )
-        
 
 
 _CMD_GET_ALL_SETTINGS = "^^^RQSALL"
 _GET_ALL_SETTINGS = ApiCall[None, GemSettings](
-    gem_formatter=lambda _: _CMD_GET_ALL_SETTINGS, gem_parser=_parse_all_settings,
-    ecm_formatter=lambda _: [b"\xfc", b"SET", b"RCV"], ecm_parser=_parse_all_ecm_settings,
+    gem_formatter=lambda _: _CMD_GET_ALL_SETTINGS,
+    gem_parser=_parse_all_settings,
+    ecm_formatter=lambda _: [b"\xfc", b"SET", b"RCV"],
+    ecm_parser=_parse_all_ecm_settings,
 )
 
-_CMD_SEND_ONE_PACKET = '^^^APISPK'
-_SEND_ONE_PACKET = ApiCall[None, None](gem_formatter = lambda _: _CMD_SEND_ONE_PACKET, gem_parser=None, ecm_formatter=None, ecm_parser=None)
+_CMD_SEND_ONE_PACKET = "^^^APISPK"
+_SEND_ONE_PACKET = ApiCall[None, None](
+    gem_formatter=lambda _: _CMD_SEND_ONE_PACKET,
+    gem_parser=None,
+    ecm_formatter=None,
+    ecm_parser=None,
+)
 
-_SET_CT_TYPE = ApiCall[(int, int), None](gem_formatter = lambda args: f"^^^CH{args[0]:02}TYP{args[1]}", gem_parser=None, ecm_formatter=None, ecm_parser=None)
-_SET_CT_RANGE = ApiCall[(int, int), None](gem_formatter = lambda args: f"^^^CH{args[0]:02}RNG{args[1]}", gem_parser = None, ecm_formatter=None, ecm_parser=None)
-_SET_CT_TYPE_AND_RANGE = ApiCall[(int, int, int), None](gem_formatter=None, gem_parser=None, ecm_formatter=lambda args: [b"\xfc", b"SET", f"CT{args[0]}".encode(), b"TYP", bytes([args[1]]), b"RNG", bytes([args[2]])], ecm_parser=None)
+_SET_CT_TYPE = ApiCall[(int, int), None](
+    gem_formatter=lambda args: f"^^^CH{args[0]:02}TYP{args[1]}",
+    gem_parser=None,
+    ecm_formatter=None,
+    ecm_parser=None,
+)
+_SET_CT_RANGE = ApiCall[(int, int), None](
+    gem_formatter=lambda args: f"^^^CH{args[0]:02}RNG{args[1]}",
+    gem_parser=None,
+    ecm_formatter=None,
+    ecm_parser=None,
+)
+_SET_CT_TYPE_AND_RANGE = ApiCall[(int, int, int), None](
+    gem_formatter=None,
+    gem_parser=None,
+    ecm_formatter=lambda args: [
+        b"\xfc",
+        b"SET",
+        f"CT{args[0]}".encode(),
+        b"TYP",
+        bytes([args[1]]),
+        b"RNG",
+        bytes([args[2]]),
+    ],
+    ecm_parser=None,
+)

@@ -136,7 +136,6 @@ class Channel:
         monitor: "Monitor",
         number: int,
         net_metering: Optional[bool] = None,
-        control: Optional["MonitorControl"] = None,
     ) -> None:
         self._monitor = monitor
         self.number: int = number
@@ -151,7 +150,6 @@ class Channel:
         self.timestamp: Optional[datetime] = None
         self.ct_type: Optional[int] = None
         self.ct_range: Optional[int] = None
-        self.control: Optional[MonitorControl] = control
         self._listeners: List[Listener] = []
 
     @property
@@ -201,17 +199,18 @@ class Channel:
         return self.polarized_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
 
     async def set_ct_type(self, type: int) -> None:
-        assert self.control
-        assert self.control.api_type
+        control = self._monitor.control
+        assert control
+        assert control.api_type
         assert self.ct_type is not None
         assert self.ct_range is not None
         if self.ct_type == type:
             return
 
-        if self.control.api_type == ApiType.GEM:
-            await self.control.set_ct_type(channel=self.number + 1, type=type)
-        elif self.control.api_type == ApiType.ECM:
-            await self.control.set_ct_type_and_range(
+        if control.api_type == ApiType.GEM:
+            await control.set_ct_type(channel=self.number + 1, type=type)
+        elif control.api_type == ApiType.ECM:
+            await control.set_ct_type_and_range(
                 channel=self.number + 1, type=type, range=self.ct_range
             )
         else:
@@ -220,17 +219,18 @@ class Channel:
         self.ct_type = type
 
     async def set_ct_range(self, range: int) -> None:
-        assert self.control
-        assert self.control.api_type
+        control = self._monitor.control
+        assert control
+        assert control.api_type
         assert self.ct_type is not None
         assert self.ct_range is not None
         if self.ct_range == range:
             return
 
-        if self.control.api_type == ApiType.GEM:
-            await self.control.set_ct_range(channel=self.number + 1, range=range)
-        elif self.control.api_type == ApiType.ECM:
-            await self.control.set_ct_type_and_range(
+        if control.api_type == ApiType.GEM:
+            await control.set_ct_range(channel=self.number + 1, range=range)
+        elif control.api_type == ApiType.ECM:
+            await control.set_ct_type_and_range(
                 channel=self.number + 1, type=self.ct_type, range=range
             )
         else:
@@ -391,6 +391,12 @@ class MonitorControl:
     def api_type(self) -> ApiType:
         return self._protocol.api_type
 
+    def set_protocol(self, protocol: GemProtocol) -> None:
+        self._protocol = protocol
+
+    async def get_settings(self) -> GemSettings:
+        return await api_ext.get_all_settings(self._protocol, self._serial_number)
+
     async def set_ct_type(self, channel: int, type: int) -> None:
         await api_ext.set_ct_type(
             self._protocol,
@@ -482,15 +488,18 @@ class Monitor:
     ) -> None:
         if self._protocol is protocol:
             return
+        if protocol is None:
+            self._protocol = None
+            self._control = None
+            return
 
         self._protocol = protocol
-        if self._protocol:
-            result = await MonitorControl.try_create(
-                self._protocol, self.serial_number, api_timeout
-            )
-            if result is not None:
-                (self._control, settings) = result
-                await self._configure_from_settings(settings, self._control)
+        result = await MonitorControl.try_create(
+            self._protocol, self.serial_number, api_timeout
+        )
+        if result is not None:
+            (self._control, settings) = result
+            await self._configure_from_settings(settings, self._control)
 
     async def _configure_from_settings(
         self, settings: GemSettings, control: MonitorControl
@@ -503,9 +512,7 @@ class Monitor:
         if len(self.channels) < settings.num_channels:
             del self.channels[settings.num_channels :]
         for num in range(len(self.channels), settings.num_channels):
-            self.channels.append(
-                Channel(self, num, settings.channel_net_metering[num], control)
-            )
+            self.channels.append(Channel(self, num, settings.channel_net_metering[num]))
 
         if self.type == MonitorType.GEM:
             # Initialize temperature sensors if needed
@@ -694,7 +701,7 @@ class Monitors:
         self, send_packet_delay: bool = True, api_timeout: timedelta | None = None
     ) -> None:
         self.monitors: Dict[int, Monitor] = {}
-        self._protocol_to_monitors: Dict[int, List[Monitor]] = {}
+        self._protocol_to_monitors: Dict[int, set[Monitor]] = {}
         self._listeners: List[MonitorListener] = []
         self._processor: MonitorProtocolProcessor = MonitorProtocolProcessor(
             self._handle_message, send_packet_delay=send_packet_delay
@@ -741,13 +748,14 @@ class Monitors:
                 await self._add_monitor(serial_number, message.protocol, packet)
             else:
                 monitor = self.monitors[serial_number]
+                await self._set_monitor_protocol(monitor, message.protocol)
                 await monitor.handle_packet(packet)
         else:
             if isinstance(message, ConnectionLostMessage):
                 for monitor in self._protocol_to_monitors.pop(protocol_id):
                     await monitor._set_protocol(None)
             elif isinstance(message, ConnectionMadeMessage):
-                self._protocol_to_monitors[protocol_id] = []
+                self._protocol_to_monitors[protocol_id] = set()
 
     async def _add_monitor(
         self, serial_number: int, protocol: GemProtocol, packet: Packet | None = None
@@ -765,7 +773,7 @@ class Monitors:
         self, monitor: Monitor, protocol: GemProtocol
     ) -> None:
         protocol_id = id(protocol)
-        self._protocol_to_monitors[protocol_id].append(monitor)
+        self._protocol_to_monitors[protocol_id].add(monitor)
         await monitor._set_protocol(protocol, api_timeout=self._api_timeout)
 
     async def _notify_new_monitor(self, monitor: Monitor) -> None:

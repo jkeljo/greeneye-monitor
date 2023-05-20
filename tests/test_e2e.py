@@ -1,6 +1,7 @@
 import asyncio
 from datetime import timedelta
 import functools
+import pytest
 from siobrultech_protocols.gem.packets import PacketFormatType
 import socket
 from typing import List, cast, Optional
@@ -72,9 +73,11 @@ class TestGEME2E(unittest.IsolatedAsyncioTestCase):
         async with self._discovered:
             self._discovered.notify()
 
+    @pytest.mark.enable_socket
     async def testMonitorConfiguredProperlyWhenClientRespondsToAPI(self):
         await self.assertMonitorConfiguredProperlyWithClient(ApiAwareClient)
 
+    @pytest.mark.enable_socket
     async def testMonitorConfiguredProperlyWhenClientIgnoresAPI(self):
         await self.assertMonitorConfiguredProperlyWithClient(
             functools.partial(ApiUnawareClient, packet="BIN32-NET.bin")
@@ -118,6 +121,7 @@ class TestECME2E(unittest.IsolatedAsyncioTestCase):
         async with self._discovered:
             self._discovered.notify()
 
+    @pytest.mark.enable_socket
     async def testMonitorConfiguredProperlyWhenClientIgnoresAPI(self) -> None:
         await self.assertMonitorConfiguredProperlyWithClient(
             functools.partial(ApiUnawareClient, packet="ECM-1240.bin")

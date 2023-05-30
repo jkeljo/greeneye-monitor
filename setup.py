@@ -25,6 +25,6 @@ setup(
     keywords="greeneye",
     packages=["greeneye"],
     package_data={"greeneye": ["py.typed"]},
-    install_requires=["aiohttp", "siobrultech-protocols==0.11"],
+    install_requires=["aiohttp", "siobrultech-protocols==0.12"],
     python_requires="~=3.10",
 )

@@ -8,6 +8,7 @@ from typing import Tuple
 from siobrultech_protocols.gem.packets import PacketFormatType
 
 from greeneye.monitor import (
+    Aux,
     Channel,
     Monitor,
     MonitorType,
@@ -152,6 +153,9 @@ def on_new_monitor(monitor: Monitor):
     for temp in monitor.temperature_sensors:
         on_new_temperature_sensor(temp)
 
+    for aux in monitor.aux:
+        on_new_aux(aux)
+
 
 def on_new_channel(channel: Channel):
     channel.add_listener(lambda: print_channel(channel))
@@ -163,6 +167,14 @@ def on_new_counter(counter: PulseCounter):
 
 def on_new_temperature_sensor(temp: TemperatureSensor):
     temp.add_listener(lambda: print_temperature(temp))
+
+
+def on_new_aux(aux: Channel | Aux):
+    if isinstance(aux, Channel):
+        on_new_channel(aux)
+    else:
+        on_new_channel(aux.channel)
+        on_new_counter(aux.pulse_counter)
 
 
 def print_monitor(monitor: Monitor):

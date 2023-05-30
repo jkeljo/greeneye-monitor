@@ -37,12 +37,13 @@ Listener = Union[Callable[[], Awaitable[None]], Callable[[], None]]
 class PulseCounter:
     """Represents a single GEM pulse-counting channel"""
 
-    def __init__(self, monitor: "Monitor", number: int) -> None:
+    def __init__(self, monitor: "Monitor", number: int, is_aux: bool = False) -> None:
         self._monitor = monitor
         self.number: int = number
         self.pulses: Optional[int] = None
         self.pulses_per_second: Optional[float] = None
         self.seconds: Optional[int] = None
+        self.is_aux: bool = is_aux
         self._listeners: List[Listener] = []
 
     def add_listener(self, listener: Listener) -> None:
@@ -52,17 +53,30 @@ class PulseCounter:
         self._listeners.remove(listener)
 
     async def handle_packet(self, packet: Packet) -> None:
-        new_value = packet.pulse_counts[self.number]
+        if not self.is_aux:
+            new_value = packet.pulse_counts[self.number]
+        else:
+            new_value = packet.aux[self.number]
         if new_value == self.pulses and self.pulses_per_second == 0:
             return
 
         if self.seconds is not None:
             elapsed_seconds = packet.delta_seconds(self.seconds)
-            self.pulses_per_second = (
-                (packet.delta_pulse_count(self.number, self.pulses) / elapsed_seconds)
-                if self.pulses is not None and elapsed_seconds > 0
-                else 0
-            )
+            if not self.is_aux:
+                self.pulses_per_second = (
+                    (
+                        packet.delta_pulse_count(self.number, self.pulses)
+                        / elapsed_seconds
+                    )
+                    if self.pulses is not None and elapsed_seconds > 0
+                    else 0
+                )
+            else:
+                self.pulses_per_second = (
+                    (packet.delta_aux_count(self.number, self.pulses) / elapsed_seconds)
+                    if self.pulses is not None and elapsed_seconds > 0
+                    else 0
+                )
 
         self.seconds = packet.seconds
         self.pulses = new_value
@@ -136,6 +150,7 @@ class Channel:
         monitor: "Monitor",
         number: int,
         net_metering: Optional[bool] = None,
+        is_aux: bool = False,
     ) -> None:
         self._monitor = monitor
         self.number: int = number
@@ -150,6 +165,7 @@ class Channel:
         self.timestamp: Optional[datetime] = None
         self.ct_type: Optional[int] = None
         self.ct_range: Optional[int] = None
+        self.is_aux: bool = is_aux
         self._listeners: List[Listener] = []
 
     @property
@@ -204,6 +220,7 @@ class Channel:
         assert control.api_type
         assert self.ct_type is not None
         assert self.ct_range is not None
+        assert not self.is_aux
         if self.ct_type == type:
             return
 
@@ -224,6 +241,7 @@ class Channel:
         assert control.api_type
         assert self.ct_type is not None
         assert self.ct_range is not None
+        assert not self.is_aux
         if self.ct_range == range:
             return
 
@@ -261,13 +279,18 @@ class Channel:
         await _invoke_listeners(self._listeners)
 
     async def handle_packet(self, packet: Packet) -> None:
-        new_absolute_watt_seconds = packet.absolute_watt_seconds[self.number]
-        new_polarized_watt_seconds = (
-            packet.polarized_watt_seconds[self.number]
-            if packet.polarized_watt_seconds
-            else None
-        )
-        new_amps = packet.currents[self.number] if packet.currents else None
+        if not self.is_aux:
+            new_absolute_watt_seconds = packet.absolute_watt_seconds[self.number]
+            new_polarized_watt_seconds = (
+                packet.polarized_watt_seconds[self.number]
+                if packet.polarized_watt_seconds
+                else None
+            )
+            new_amps = packet.currents[self.number] if packet.currents else None
+        else:
+            new_absolute_watt_seconds = packet.aux[self.number]
+            new_polarized_watt_seconds = None
+            new_amps = None
 
         if (
             self.absolute_watt_seconds == new_absolute_watt_seconds
@@ -283,13 +306,20 @@ class Channel:
 
             # This is the total energy produced or consumed since the last
             # sample.
-            delta_total_watt_seconds = (
-                packet.delta_absolute_watt_seconds(
-                    self.number, self.absolute_watt_seconds
+            if not self.is_aux:
+                delta_total_watt_seconds = (
+                    packet.delta_absolute_watt_seconds(
+                        self.number, self.absolute_watt_seconds
+                    )
+                    if self.absolute_watt_seconds is not None
+                    else 0
                 )
-                if self.absolute_watt_seconds is not None
-                else 0
-            )
+            else:
+                delta_total_watt_seconds = (
+                    packet.delta_aux_count(self.number, self.absolute_watt_seconds)
+                    if self.absolute_watt_seconds is not None
+                    else 0
+                )
 
             # This is the energy produced since the last sample. This will be 0
             # for all channels except for channels in NET metering mode that
@@ -332,34 +362,22 @@ class Aux:
     def __init__(self, monitor: "Monitor", number: int) -> None:
         self._monitor = monitor
         self.number: int = number
-        self.value: Optional[int] = None
-        self.rate_of_change: Optional[float] = None
-        self.seconds: Optional[int] = None
-        self._listeners: List[Listener] = []
+        self.pulse_counter = PulseCounter(monitor, number, is_aux=True)
+        self.channel = Channel(monitor, number, net_metering=False, is_aux=True)
 
     def add_listener(self, listener: Listener) -> None:
-        self._listeners.append(listener)
+        self.pulse_counter.add_listener(listener)
+        self.channel.add_listener(listener)
 
     def remove_listener(self, listener: Listener) -> None:
-        self._listeners.remove(listener)
+        self.pulse_counter.remove_listener(listener)
+        self.channel.remove_listener(listener)
 
     async def handle_packet(self, packet: Packet) -> None:
-        new_value = packet.aux[self.number]
-        if new_value == self.value:
-            return
-
-        if self.seconds is not None:
-            elapsed_seconds = packet.delta_seconds(self.seconds)
-            self.rate_of_change = (
-                (packet.delta_aux_count(self.number, self.value) / elapsed_seconds)
-                if self.value is not None and elapsed_seconds > 0
-                else 0
-            )
-
-        self.seconds = packet.seconds
-        self.value = new_value
-
-        await _invoke_listeners(self._listeners)
+        await asyncio.gather(
+            self.pulse_counter.handle_packet(packet),
+            self.channel.handle_packet(packet),
+        )
 
 
 NUM_PULSE_COUNTERS: int = 4
@@ -468,7 +486,7 @@ class Monitor:
         self.channels: List[Channel] = []
         self.pulse_counters: List[PulseCounter] = []
         self.temperature_sensors: List[TemperatureSensor] = []
-        self.aux: List[Aux] = []
+        self.aux: List[Channel | Aux] = []
         self.voltage_sensor: VoltageSensor = VoltageSensor(self)
         self.packet_send_interval: timedelta = timedelta(seconds=0)
         self.packet_format: Optional[PacketFormatType] = None
@@ -551,24 +569,27 @@ class Monitor:
     async def _configure_from_packet(self, packet: Packet) -> None:
         self.packet_format = packet.packet_format.type
 
-        for num in range(0, packet.num_channels):
-            self.channels.append(Channel(self, num))
+        if not self.aux and len(packet.aux) == 5:
+            for num in range(0, 4):
+                self.aux.append(Channel(self, num, net_metering=False, is_aux=True))
+            self.aux.append(Aux(self, 4))
 
-        for num in range(0, len(packet.temperatures)):
-            self.temperature_sensors.append(TemperatureSensor(self, num))
+        if not self._configured:
+            for num in range(0, packet.num_channels):
+                self.channels.append(Channel(self, num))
 
-        for num in range(0, len(packet.aux)):
-            self.aux.append(Aux(self, num))
+            for num in range(0, len(packet.temperatures)):
+                self.temperature_sensors.append(TemperatureSensor(self, num))
 
-        if self.type == MonitorType.GEM:
-            self.pulse_counters = [
-                PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
-            ]
+            if self.type == MonitorType.GEM:
+                self.pulse_counters = [
+                    PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
+                ]
 
-        # Voltage sensor was created up front
+            # Voltage sensor was created up front
 
-        self._configured = True
-        LOG.info(f"Configured {self.serial_number} from first packet.")
+            self._configured = True
+            LOG.info(f"Configured {self.serial_number} from first packet.")
         coroutines = []
         for listener in self._listeners:
             coroutines.append(_ensure_coroutine(listener)())
@@ -587,9 +608,7 @@ class Monitor:
         self._listeners.remove(listener)
 
     async def handle_packet(self, packet: Packet) -> None:
-        if not self._configured:
-            await self._configure_from_packet(packet)
-        self.packet_format = packet.packet_format.type
+        await self._configure_from_packet(packet)
 
         if self._last_packet_seconds is not None:
             elapsed_seconds = packet.delta_seconds(self._last_packet_seconds)
@@ -604,6 +623,8 @@ class Monitor:
             await temperature_sensor.handle_packet(packet)
         for pulse_counter in self.pulse_counters:
             await pulse_counter.handle_packet(packet)
+        for aux in self.aux:
+            await aux.handle_packet(packet)
         await _invoke_listeners(self._listeners)
 
 

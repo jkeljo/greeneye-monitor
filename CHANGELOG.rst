@@ -4,6 +4,19 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[4.0] - 2023-05-30
+==================
+New Features
+------------
+* Support for ECM-1220 and ECM-1240, including basic API support
+* API support for setting packet interval and CT type and range
+* Generally faster and more robust
+
+Fixed
+-----
+* Don't crash when monitors ignore API calls (e.g. if there is a DashBox in the middle)
+* Don't crash if two packets come in with no seconds in between
+
 [3.0.3] - 2022-02-20
 ====================
 
@@ -34,7 +47,7 @@ New Features
 * `Channel`s now know if they are configured for net metering. `kilowatt_hours` property takes that into account.
 * `TemperatureSensor`s now know what unit they are reporting.
 * Full `py.typed` info is now provided
-* Configure where the GEM sends its packets using `Monitor.set_packet_destination` 
+* Configure where the GEM sends its packets using `Monitor.set_packet_destination`
 * Configure what format of packet the GEM sends using `Monitor.set_packet_format`
 
 Changed

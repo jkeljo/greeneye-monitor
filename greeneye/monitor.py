@@ -547,9 +547,9 @@ class Monitor:
                     TemperatureSensor(self, num, settings.temperature_unit)
                 )
 
-            self.pulse_counters = [
-                PulseCounter(self, num) for num in range(0, NUM_PULSE_COUNTERS)
-            ]
+            # Initialize pulse counters if needed
+            for num in range(len(self.pulse_counters), NUM_PULSE_COUNTERS):
+                self.pulse_counters.append(PulseCounter(self, num))
 
         # Voltage sensor was created up front
 

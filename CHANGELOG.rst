@@ -4,6 +4,12 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[4.0.1] - 2023-08-06
+====================
+Fixed
+-----
+* Don't re-create PulseCounter objects when re-configuring a Monitor from settings
+
 [4.0] - 2023-05-30
 ==================
 New Features

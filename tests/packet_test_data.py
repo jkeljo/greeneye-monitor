@@ -1,6 +1,6 @@
 import datetime
-from io import StringIO
 import os
+from io import StringIO
 
 greeneye_dir = os.path.dirname(os.path.abspath(__file__))
 greeneye_data_dir = os.path.join(greeneye_dir, "data")

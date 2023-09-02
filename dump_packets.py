@@ -1,18 +1,18 @@
-import aiohttp
-from argparse import ArgumentParser
 import asyncio
 import logging
 import sys
+from argparse import ArgumentParser
 from typing import Tuple
 
+import aiohttp
 from siobrultech_protocols.gem.packets import PacketFormatType
 
 from greeneye.monitor import (
     Aux,
     Channel,
     Monitor,
-    MonitorType,
     Monitors,
+    MonitorType,
     PulseCounter,
     TemperatureSensor,
     VoltageSensor,
@@ -34,7 +34,10 @@ async def main():
 
     spy_command = subcommands.add_parser(
         "spy",
-        description="Connects to a GEM at the given IP and spies on whatever packets it is sending (regardless of their destination).",
+        description=(
+            "Connects to a GEM at the given IP and spies on whatever packets it is"
+            " sending (regardless of their destination)."
+        ),
     )
     spy_command.add_argument(
         "host", help="Hostname or IP address of the GEM to which to connect."
@@ -42,7 +45,10 @@ async def main():
 
     redirect_command = subcommands.add_parser(
         "redirect",
-        description="Connects to a GEM and redirects its packets to this machine, redirecting back afterwards.",
+        description=(
+            "Connects to a GEM and redirects its packets to this machine, redirecting"
+            " back afterwards."
+        ),
     )
     redirect_command.add_argument(
         "--gem", required=True, help="Hostname or IP address of the GEM."
@@ -100,7 +106,7 @@ async def listen(port: int) -> None:
 async def spy(host: str) -> None:
     async with Monitors() as monitors:
         monitors.add_listener(on_new_monitor)
-        monitor = await monitors.connect(host)
+        _monitor = await monitors.connect(host)
         while True:
             try:
                 await asyncio.sleep(60)
@@ -179,7 +185,8 @@ def on_new_aux(aux: Channel | Aux):
 
 def print_monitor(monitor: Monitor):
     print(
-        f"Monitor {monitor.serial_number} ({monitor.type}) sending packets every {monitor.packet_send_interval}"
+        f"Monitor {monitor.serial_number} ({monitor.type}) sending packets every"
+        f" {monitor.packet_send_interval}"
     )
 
 

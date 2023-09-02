@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import aiohttp
 import asyncio
+import logging
+import struct
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, unique
 from itertools import chain
-import logging
 from typing import Any, Optional, Tuple
-from siobrultech_protocols.gem.api import (
-    call_api,
-)
+
+import aiohttp
+from siobrultech_protocols.gem.api import call_api
 from siobrultech_protocols.gem.packets import PacketFormatType
 from siobrultech_protocols.gem.protocol import ApiCall, ApiType, BidirectionalProtocol
-import struct
 
 LOG = logging.getLogger(__name__)
 
@@ -131,11 +130,11 @@ def _parse_all_settings(response: str) -> GemSettings | None:
         offset += size
         return result
 
-    # Unpack all the options defined in the docs. The docs are somewhat spotty, and we only currently
-    # need a few of these, so we're exposing only a few accessors.
+    # Unpack all the options defined in the docs. The docs are somewhat spotty, and we
+    # only currently need a few of these, so we're exposing only a few accessors.
     _channel_options = unpack("x48B")
     channel_net_metering = [options & 0x40 == 0 for options in _channel_options]
-    channel_polarity_toggled = [options & 0x80 == 0x80 for options in _channel_options]
+    _channel_polarity_toggled = [options & 0x80 == 0x80 for options in _channel_options]
     ct_types = list(unpack("48B"))
     ct_ranges = list(
         chain.from_iterable([[b & 0x0F, (b & 0xF0) >> 4] for b in unpack("24B")])
@@ -232,7 +231,7 @@ def _parse_all_ecm_settings(binary: bytes) -> GemSettings | None:
     _data_logger_interval = unpack("B")[0]
     _firmware_version = unpack(">H")[0]
     _device_id = unpack("B")[0]
-    serial_number = unpack(">H")[0]
+    _serial_number = unpack(">H")[0]
     unpack("16x")
     _trigger_value = unpack("<H")[0]
     zero = unpack("B")[0]

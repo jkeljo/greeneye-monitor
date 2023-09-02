@@ -1,9 +1,9 @@
-from datetime import timedelta
 import unittest
+from datetime import timedelta
 
 from siobrultech_protocols.gem.packets import PacketFormatType
 
-from greeneye.api import GemSettings, TemperatureUnit, _parse_all_settings
+from greeneye.api import TemperatureUnit, _parse_all_settings
 
 
 class TestAllSettings(unittest.TestCase):

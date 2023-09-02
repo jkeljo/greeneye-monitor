@@ -1,0 +1,12 @@
+---
+name: Lint
+
+on: pull_request  # yamllint disable-line rule:truthy
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Lint with ruff
+        uses: chartboost/ruff-action@v1

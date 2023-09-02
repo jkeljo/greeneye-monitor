@@ -1,1 +1,1 @@
-from .monitor import Monitors
+from .monitor import Monitors  # noqa: F401

@@ -1,15 +1,14 @@
-from enum import Enum
-import aiohttp
 import asyncio
-from asyncio.base_events import Server
-from datetime import datetime, timedelta
-from functools import wraps
 import inspect
 import logging
 import socket
+from asyncio.base_events import Server
+from datetime import datetime, timedelta
+from enum import Enum
 from types import TracebackType
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 
+import aiohttp
 from siobrultech_protocols.gem import api
 from siobrultech_protocols.gem.packets import Packet, PacketFormatType
 from siobrultech_protocols.gem.protocol import (
@@ -21,10 +20,7 @@ from siobrultech_protocols.gem.protocol import (
 )
 
 from . import api as api_ext
-from .api import (
-    GemSettings,
-    TemperatureUnit,
-)
+from .api import GemSettings, TemperatureUnit
 from .protocol import GemProtocol
 
 LOG = logging.getLogger(__name__)
@@ -397,8 +393,9 @@ class MonitorControl:
             )
             # await api_ext.send_one_packet(protocol, serial_number)
             return (MonitorControl(protocol, serial_number), settings)
-        except:
-            # The remote either timed out or returned binary data, which probably indicates it's a DashBox
+        except Exception:
+            # The remote either timed out or returned binary data, which probably
+            # indicates it's a DashBox
             return None
 
     def __init__(self, protocol: GemProtocol, serial_number: int) -> None:

@@ -1,5 +1,6 @@
-from siobrultech_protocols.gem.protocol import BidirectionalProtocol
 from typing import Optional, Tuple
+
+from siobrultech_protocols.gem.protocol import BidirectionalProtocol
 
 
 class GemProtocol(BidirectionalProtocol):

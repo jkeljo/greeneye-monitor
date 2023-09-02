@@ -1,15 +1,7 @@
 ---
 name: Test
 
-on:
-  push:
-    branches:
-      - "main"
-      - "v**"
-  pull_request:
-    branches:
-      - "main"
-      - "v**"
+on: push, pull_request
 
 jobs:
   test:

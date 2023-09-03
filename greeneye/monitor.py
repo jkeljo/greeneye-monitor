@@ -198,7 +198,10 @@ class Channel:
         if self.absolute_watt_seconds is None or self.polarized_watt_seconds is None:
             return None
 
-        return self.absolute_watt_seconds - self.polarized_watt_seconds
+        consumed = self.absolute_watt_seconds - self.polarized_watt_seconds
+        produced = self.polarized_watt_seconds
+
+        return consumed - produced
 
     @property
     def net_kilowatt_hours(self) -> Optional[float]:

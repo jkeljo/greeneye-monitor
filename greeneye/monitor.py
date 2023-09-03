@@ -369,8 +369,10 @@ class Aux:
     def __init__(self, monitor: "Monitor", number: int) -> None:
         self._monitor = monitor
         self.number: int = number
-        self.pulse_counter = PulseCounter(monitor, number, is_aux=True)
-        self.channel = Channel(monitor, number, net_metering=False, is_aux=True)
+        self.pulse_counter: PulseCounter = PulseCounter(monitor, number, is_aux=True)
+        self.channel: Channel = Channel(
+            monitor, number, net_metering=False, is_aux=True
+        )
 
     def add_listener(self, listener: Listener) -> None:
         self.pulse_counter.add_listener(listener)

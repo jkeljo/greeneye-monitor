@@ -62,6 +62,15 @@ repos:
       - id: pyright
         name: pyright
         language: system
-        entry: poetry run pyright --verbose
+        entry: poetry run pyright
+        files: .*\.py$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: verifytypes
+        name: verifytypes
+        language: system
+        entry: poetry run pyright --verifytypes greeneye --ignoreexternal
         files: .*\.py$
         pass_filenames: false

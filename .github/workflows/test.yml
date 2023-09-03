@@ -28,5 +28,9 @@ jobs:
         run: poetry build -f wheel
       - name: Typecheck with pyright
         uses: jakebailey/pyright-action@v1
+      - name: Check type completeness with pyright
+        uses: jakebailey/pyright-action@v1
+        ignore-external: true
+        verify-types: greeneye
       - name: Run tests
         run: poetry run pytest

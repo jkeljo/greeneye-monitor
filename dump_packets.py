@@ -115,7 +115,7 @@ async def spy(host: str) -> None:
 
 
 async def redirect(
-    gem: str, original=Tuple[str, int], redirect=Tuple[str, int]
+    gem: str, original: Tuple[str, int], redirect: Tuple[str, int]
 ) -> None:
     async with aiohttp.ClientSession() as session:
         async with Monitors() as monitors:

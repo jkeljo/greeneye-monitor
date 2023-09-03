@@ -6,7 +6,18 @@ from asyncio.base_events import Server
 from datetime import datetime, timedelta
 from enum import Enum
 from types import TracebackType
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    ParamSpec,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import aiohttp
 from siobrultech_protocols.gem import api
@@ -358,8 +369,10 @@ class Aux:
     def __init__(self, monitor: "Monitor", number: int) -> None:
         self._monitor = monitor
         self.number: int = number
-        self.pulse_counter = PulseCounter(monitor, number, is_aux=True)
-        self.channel = Channel(monitor, number, net_metering=False, is_aux=True)
+        self.pulse_counter: PulseCounter = PulseCounter(monitor, number, is_aux=True)
+        self.channel: Channel = Channel(
+            monitor, number, net_metering=False, is_aux=True
+        )
 
     def add_listener(self, listener: Listener) -> None:
         self.pulse_counter.add_listener(listener)
@@ -551,7 +564,7 @@ class Monitor:
         # Voltage sensor was created up front
 
         # Now update settings if needed and trigger listeners
-        coroutines = []
+        coroutines: list[Awaitable[None]] = []
         for temperature_sensor in self.temperature_sensors:
             coroutines.append(temperature_sensor.handle_settings(settings))
         for channel in self.channels:
@@ -587,12 +600,10 @@ class Monitor:
 
             self._configured = True
             LOG.info(f"Configured {self.serial_number} from first packet.")
-        coroutines = []
-        for listener in self._listeners:
-            coroutines.append(_ensure_coroutine(listener)())
-        await asyncio.gather(*coroutines)
+        await _invoke_listeners(self._listeners)
 
     async def set_packet_send_interval(self, seconds: int) -> None:
+        assert self._control
         await self._control.set_packet_send_interval(seconds)
 
     def set_packet_interval(self, seconds: int) -> None:
@@ -626,9 +637,11 @@ class Monitor:
 
 
 async def _invoke_listeners(listeners: List[Listener]) -> None:
-    coroutines = [_ensure_coroutine(listener)() for listener in listeners]
+    coroutines: list[Awaitable[None]] = [
+        _ensure_coroutine(listener)() for listener in listeners
+    ]
     if len(coroutines) > 0:
-        await asyncio.gather(*coroutines)  # type: ignore
+        await asyncio.gather(*coroutines)
 
 
 ServerListener = Callable[[PacketProtocolMessage], Awaitable[None]]
@@ -640,7 +653,9 @@ class MonitorProtocolProcessor:
     packet."""
 
     def __init__(self, listener: ServerListener, send_packet_delay: bool) -> None:
-        self._consumer_task = asyncio.ensure_future(self._consumer())
+        self._consumer_task: asyncio.Task[None] | None = asyncio.ensure_future(
+            self._consumer()
+        )
         LOG.debug("Packet processor started")
         self._listener = listener
         self._queue: asyncio.Queue[PacketProtocolMessage] = asyncio.Queue()
@@ -783,7 +798,7 @@ class Monitors:
         else:
             if isinstance(message, ConnectionLostMessage):
                 for monitor in self._protocol_to_monitors.pop(protocol_id):
-                    await monitor._set_protocol(None)
+                    await monitor._set_protocol(None)  # type: ignore
             elif isinstance(message, ConnectionMadeMessage):
                 self._protocol_to_monitors[protocol_id] = set()
 
@@ -804,7 +819,9 @@ class Monitors:
     ) -> None:
         protocol_id = id(protocol)
         self._protocol_to_monitors[protocol_id].add(monitor)
-        await monitor._set_protocol(protocol, api_timeout=self._api_timeout)
+        await monitor._set_protocol(  # type: ignore
+            protocol, api_timeout=self._api_timeout
+        )
 
     async def _notify_new_monitor(self, monitor: Monitor) -> None:
         listeners = [
@@ -814,12 +831,18 @@ class Monitors:
             await asyncio.gather(*listeners)  # type: ignore
 
 
-def _ensure_coroutine(listener):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def _ensure_coroutine(
+    listener: Union[Callable[P, Awaitable[R]], Callable[P, R]]
+) -> Callable[P, Awaitable[R]]:
     if inspect.iscoroutinefunction(listener):
         return listener
     else:
 
-        async def async_listener(*args):
-            listener(*args)
+        async def async_listener(*args: P.args, **kwargs: P.kwargs) -> R:
+            return listener(*args, **kwargs)  # type: ignore
 
         return async_listener

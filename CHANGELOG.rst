@@ -4,6 +4,12 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[4.1] - 2023-09-02
+====================
+Fixed
+-----
+* Correct net_watt_seconds to report net watt-seconds rather than consumed watt-seconds
+
 [4.0.1] - 2023-08-06
 ====================
 Fixed

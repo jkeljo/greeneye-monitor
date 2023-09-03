@@ -3,7 +3,7 @@ import functools
 import socket
 import unittest
 from datetime import timedelta
-from typing import Optional, cast
+from typing import Callable, Optional, cast
 
 import pytest
 from siobrultech_protocols.gem.packets import PacketFormatType
@@ -85,7 +85,9 @@ class TestGEME2E(unittest.IsolatedAsyncioTestCase):
             functools.partial(ApiUnawareClient, packet="BIN32-NET.bin")
         )
 
-    async def assertMonitorConfiguredProperlyWithClient(self, client):
+    async def assertMonitorConfiguredProperlyWithClient(
+        self, client: Callable[[], asyncio.Protocol]
+    ):
         loop = asyncio.get_event_loop()
         async with Monitors(
             send_packet_delay=False, api_timeout=timedelta(seconds=0)
@@ -129,7 +131,9 @@ class TestECME2E(unittest.IsolatedAsyncioTestCase):
             functools.partial(ApiUnawareClient, packet="ECM-1240.bin")
         )
 
-    async def assertMonitorConfiguredProperlyWithClient(self, client):
+    async def assertMonitorConfiguredProperlyWithClient(
+        self, client: Callable[[], asyncio.Protocol]
+    ):
         loop = asyncio.get_event_loop()
         async with Monitors(
             send_packet_delay=False, api_timeout=timedelta(seconds=0)

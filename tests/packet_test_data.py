@@ -2,6 +2,8 @@ import datetime
 import os
 from io import StringIO
 
+from siobrultech_protocols.gem.packets import Packet
+
 greeneye_dir = os.path.dirname(os.path.abspath(__file__))
 greeneye_data_dir = os.path.join(greeneye_dir, "data")
 
@@ -779,7 +781,7 @@ PACKETS = {
 }
 
 
-def read_packets(packet_file_names):
+def read_packets(packet_file_names: list[str]) -> bytes:
     result = bytearray()
     for packet_file_name in packet_file_names:
         result.extend(read_packet(packet_file_name))
@@ -787,12 +789,12 @@ def read_packets(packet_file_names):
     return bytes(result)
 
 
-def read_packet(packet_file_name):
+def read_packet(packet_file_name: str) -> bytes:
     with open(os.path.join(greeneye_data_dir, packet_file_name), "rb") as data_file:
         return data_file.read()
 
 
-def assert_packet(packet_file_name, parsed_packet):
+def assert_packet(packet_file_name: str, parsed_packet: Packet):
     expected_packet = PACKETS[packet_file_name]
 
     expected = StringIO()

@@ -266,20 +266,20 @@ _SEND_ONE_PACKET = ApiCall[None, None](
     ecm_parser=None,
 )
 
-_SET_CT_TYPE = ApiCall[(int, int), None](
+_SET_CT_TYPE = ApiCall[Tuple[int, int], None](
     gem_formatter=lambda args: f"^^^C{args[0]:02}TYP{args[1]}",
     gem_parser=None,
     ecm_formatter=None,
     ecm_parser=None,
 )
-_SET_CT_RANGE = ApiCall[(int, int), None](
+_SET_CT_RANGE = ApiCall[Tuple[int, int], None](
     gem_formatter=lambda args: f"^^^C{args[0]:02}RNG{args[1]}",
     gem_parser=None,
     ecm_formatter=None,
     ecm_parser=None,
 )
-_SET_CT_TYPE_AND_RANGE = ApiCall[(int, int, int), None](
-    gem_formatter=None,
+_SET_CT_TYPE_AND_RANGE = ApiCall[Tuple[int, int, int], None](
+    gem_formatter=None,  # type: ignore
     gem_parser=None,
     ecm_formatter=lambda args: [
         b"\xfc",

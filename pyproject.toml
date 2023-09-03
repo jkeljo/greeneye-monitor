@@ -28,5 +28,11 @@ siobrultech-protocols = "0.12"
 
 [tool.poetry.group.test.dependencies]
 ruff = "*"
+pyright = "*"
 pytest = "*"
 pytest-socket = "*"
+
+[tool.pyright]
+include = ["greeneye", "tests", "dump_packets.py"]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"

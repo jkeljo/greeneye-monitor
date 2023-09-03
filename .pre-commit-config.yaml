@@ -56,3 +56,12 @@ repos:
         # https://pre-commit.com/#top_level-default_language_version
         language_version: python3.11
         args: [--experimental-string-processing]
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        language: system
+        entry: poetry run pyright --verbose
+        files: .*\.py$
+        pass_filenames: false

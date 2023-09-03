@@ -23,7 +23,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install poetry
           poetry install
+          echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
       - name: Build the wheel
         run: poetry build -f wheel
+      - name: Typecheck with pyright
+        uses: jakebailey/pyright-action@v1
       - name: Run tests
         run: poetry run pytest

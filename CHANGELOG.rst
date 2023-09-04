@@ -4,6 +4,12 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[5.0] - 2023-09-04
+==================
+Changed
+-------
+* Eliminate net_watt_seconds/net_kilowatt_hours; watt_seconds and kilowatt_hours are all we need
+
 [4.1] - 2023-09-02
 ====================
 Fixed

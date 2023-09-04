@@ -162,8 +162,6 @@ class Channel:
         self._monitor = monitor
         self.number: int = number
         self.net_metering: Optional[bool] = net_metering
-        self.total_absolute_watt_seconds: Optional[int] = None
-        self.total_polarized_watt_seconds: Optional[int] = None
         self.absolute_watt_seconds: Optional[int] = None
         self.polarized_watt_seconds: Optional[int] = None
         self.amps: Optional[float] = None
@@ -177,38 +175,22 @@ class Channel:
 
     @property
     def watt_seconds(self) -> Optional[float]:
-        if self.net_metering is None:
-            return None
-        elif not self.net_metering:
-            return self.absolute_watt_seconds
-        else:
-            return self.net_watt_seconds
-
-    @property
-    def kilowatt_hours(self) -> Optional[float]:
-        if self.net_metering is None:
-            return None
-        elif not self.net_metering:
-            return self.absolute_kilowatt_hours
-        else:
-            return self.net_kilowatt_hours
-
-    @property
-    def net_watt_seconds(self) -> Optional[float]:
-        if self.absolute_watt_seconds is None or self.polarized_watt_seconds is None:
+        if self.absolute_watt_seconds is None:
             return None
 
-        consumed = self.absolute_watt_seconds - self.polarized_watt_seconds
-        produced = self.polarized_watt_seconds
+        # Polarized can be None if net metering is off for a channel
+        polarized_watt_seconds = self.polarized_watt_seconds or 0
+        consumed = self.absolute_watt_seconds - polarized_watt_seconds
+        produced = polarized_watt_seconds
 
         return consumed - produced
 
     @property
-    def net_kilowatt_hours(self) -> Optional[float]:
-        if self.net_watt_seconds is None:
+    def kilowatt_hours(self) -> Optional[float]:
+        if self.watt_seconds is None:
             return None
 
-        return self.net_watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
+        return self.watt_seconds / WATTS_PER_KILOWATT / SECONDS_PER_HOUR
 
     @property
     def absolute_kilowatt_hours(self) -> Optional[float]:

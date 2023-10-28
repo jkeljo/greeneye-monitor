@@ -4,6 +4,12 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[5.0.1] - 2023-10-28
+====================
+Changed
+-------
+* Upgraded siobrultech_protocols to 0.13 (now returns `None` for invalid temperatures)
+
 [5.0] - 2023-09-04
 ==================
 Changed

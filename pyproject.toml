@@ -3,7 +3,7 @@ profile = "black"
 
 [tool.poetry]
 name = "greeneye_monitor"
-version = "5.0"
+version = "5.0.1"
 description = "Receive data packets from GreenEye Monitor (http://www.brultech.com/greeneye/)"
 homepage = "https://github.com/jkeljo/greeneye-monitor"
 repository = "https://github.com/jkeljo/greeneye-monitor"

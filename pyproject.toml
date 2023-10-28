@@ -24,7 +24,7 @@ classifiers=[
 [tool.poetry.dependencies]
 python = "^3.10"
 aiohttp = "^3.8.5"
-siobrultech-protocols = "0.12"
+siobrultech-protocols = "0.13"
 
 [tool.poetry.group.test.dependencies]
 ruff = "*"

@@ -558,7 +558,8 @@ class Monitor:
         LOG.info(f"Configured {self.serial_number} from settings API call.")
 
         for listener in self._listeners:
-            coroutines.append(_ensure_coroutine(listener)())
+            coroutine: Callable[[], Awaitable[None]] = _ensure_coroutine(listener)
+            coroutines.append(coroutine())
         await asyncio.gather(*coroutines)
 
     async def _configure_from_packet(self, packet: Packet) -> None:
@@ -622,9 +623,7 @@ class Monitor:
 
 
 async def _invoke_listeners(listeners: List[Listener]) -> None:
-    coroutines: list[Awaitable[None]] = [
-        _ensure_coroutine(listener)() for listener in listeners
-    ]
+    coroutines = [_ensure_coroutine(listener)() for listener in listeners]
     if len(coroutines) > 0:
         await asyncio.gather(*coroutines)
 

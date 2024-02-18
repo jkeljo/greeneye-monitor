@@ -4,6 +4,12 @@ Changelog
 greeneye-monitor
 ++++++++++++++++
 
+[5.0.2] - 2024-02-18
+====================
+Fixed
+-----
+* Fixed `Monitors.close` to not hang forever on Python 3.12
+
 [5.0.1] - 2023-10-28
 ====================
 Changed

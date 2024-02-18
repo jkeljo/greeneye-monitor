@@ -693,31 +693,32 @@ class MonitorProtocolProcessor:
 
     async def close(self) -> None:
         if self._server is not None:
-            LOG.info(
-                "Closing server on {}".format(self._server.sockets[0].getsockname())
-            )
+            sockname = self._server.sockets[0].getsockname()
+            LOG.info("Closing the server on {}...".format(sockname))
             # Disallow new connections
             self._server.close()
+
+            # Wait for packets to be processed
+            await self._queue.join()
+
+            if self._consumer_task is not None:
+                # Cancel consumer task
+                self._consumer_task.cancel()
+                try:
+                    await self._consumer_task
+                except asyncio.CancelledError:
+                    pass
+                self._consumer_task = None
+
+            while len(self._protocols) > 0:
+                (_, protocol) = self._protocols.popitem()
+                protocol.close()
 
             # Wait for shutdown
             await self._server.wait_closed()
             self._server = None
 
-            # Wait for packets to be processed
-            await self._queue.join()
-
-        if self._consumer_task is not None:
-            # Cancel consumer task
-            self._consumer_task.cancel()
-            try:
-                await self._consumer_task
-            except asyncio.CancelledError:
-                pass
-            self._consumer_task = None
-
-        while len(self._protocols) > 0:
-            (_, protocol) = self._protocols.popitem()
-            protocol.close()
+            LOG.info("Closed the server on {}.".format(sockname))
 
 
 MonitorListener = Union[Callable[[Monitor], Awaitable[None]], Callable[[Monitor], None]]
